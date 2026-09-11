@@ -90,7 +90,9 @@ function generateAdaptive(
   for (const wb of weakBgs) bgWeakness.set(wb.bigram, wb.weakness);
   const topWeak = new Set(weakKeys.slice(0, 4).map((w) => w.key));
 
-  const pool = [...COMMON_WORDS, ...HARD_WORDS];
+  // dedupe: a handful of words legitimately exist in both lists; scoring them
+  // twice would double-count them in the drill-candidate window
+  const pool = Array.from(new Set([...COMMON_WORDS, ...HARD_WORDS]));
   const intensity01 = Math.max(0, Math.min(1, intensity / 100));
 
   // If we don't know the typist yet, fall back to a normal word test

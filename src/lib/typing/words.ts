@@ -1,5 +1,14 @@
-// Top ~800 common English words used for test generation.
-export const COMMON_WORDS: string[] = [
+// Vocabulary pools for test generation. Static and bundled on purpose: Cadence
+// is local-first, so the dictionary ships with the app and never needs network.
+//
+// Sizing notes (see scripts/dict-audit.ts):
+// - CORE + EXTENDED is ~1300 unique everyday words. At that size a 25-word test
+//   still draws ~24.5 distinct words, and 120s time mode repeats far less.
+// - Rare letters (q/x/j/z/k) need enough carrier words for adaptive curation to
+//   vary its drills; EXTENDED was curated to lift each of them above ~20 words.
+// - COMMON_WORDS is deduplicated at module load, so overlap between the arrays
+//   below is harmless.
+export const CORE_WORDS: string[] = [
   "the", "be", "of", "and", "a", "to", "in", "he", "have", "it", "that", "for", "they", "i", "with",
   "as", "not", "on", "she", "at", "by", "this", "we", "you", "do", "but", "from", "or", "which", "one",
   "would", "all", "will", "there", "say", "who", "make", "when", "can", "more", "if", "no", "man",
@@ -50,6 +59,154 @@ export const COMMON_WORDS: string[] = [
   "ultra", "vast", "warm", "young", "zippy", "bold", "cozy", "dizzy", "eloquent", "funky",
 ];
 
+// Extended everyday vocabulary, banded by theme. Curated to fill coverage gaps
+// in CORE (everyday basics it lacked: big, bad, night, week, cat, fish, egg...)
+// and to give rare letters enough carrier words for adaptive drill variety.
+export const EXTENDED_WORDS: string[] = [
+  // animals & wildlife
+  "bear", "bee", "bird", "bull", "butterfly", "camel", "cat", "crow", "deer", "donkey",
+  "eagle", "fish", "frog", "goat", "goose", "hen", "horse", "insect", "lamb", "owl",
+  "pig", "seal", "shark", "sheep", "snake", "spider", "swan", "wolf", "worm",
+  // nature & weather
+  "beach", "cave", "cliff", "climate", "coast", "dawn", "desert", "dirt", "drought",
+  "dust", "dusk", "earth", "flood", "fog", "frost", "grass", "heat", "hill", "ice",
+  "island", "jungle", "lake", "leaf", "lightning", "mist", "moon", "mud", "nature",
+  "nest", "noon", "pond", "rain", "rainbow", "root", "sand", "seed", "shore", "sky",
+  "snow", "soil", "stream", "summer", "sunrise", "sunset", "sunlight", "midnight",
+  "thunder", "tide", "wave", "wood", "branch", "winter", "spring", "autumn",
+  // food & drink
+  "bacon", "biscuit", "cabbage", "cake", "candy", "cereal", "chicken", "chocolate",
+  "cookie", "cream", "dessert", "dinner", "lunch", "breakfast", "egg", "flavor",
+  "flour", "fruit", "garlic", "ginger", "honey", "jam", "juice", "lettuce", "meat",
+  "meal", "milk", "noodle", "pancake", "pie", "rice", "salt", "sandwich", "sauce",
+  "sausage", "snack", "steak", "tea", "toast", "vegetable", "yogurt", "recipe",
+  // kitchen & table
+  "menu", "dish", "plate", "bowl", "cup", "fork", "knife", "spoon", "bottle", "glass",
+  "kitchen",
+  // body & health
+  "ankle", "blood", "bone", "brain", "cheek", "chest", "chin", "elbow", "finger",
+  "flesh", "hair", "heel", "knee", "leg", "lip", "muscle", "neck", "nerve", "nose",
+  "pulse", "shoulder", "skin", "stomach", "sweat", "throat", "thumb", "toe",
+  "tongue", "tooth", "waist", "wrist", "breath", "fever", "headache", "pain",
+  "illness", "injury", "disease", "hunger", "thirst", "tear", "beard",
+  // household objects
+  "bag", "ball", "balloon", "band", "bank", "basket", "bath", "bathroom", "bed",
+  "bell", "belt", "bench", "bicycle", "bill", "blanket", "block", "board", "boat",
+  "box", "brick", "brush", "bucket", "cable", "camera", "ceiling", "cell", "chain",
+  "chair", "clock", "cloth", "clothes", "coat", "coin", "corner", "couch",
+  "country", "curtain", "desk", "device", "drawer", "fence", "file", "fire", "flag",
+  "floor", "frame", "furniture", "garage", "gate", "gear", "gift", "glove", "glue",
+  "gold", "hook", "iron", "jacket", "jail", "jeans", "jewelry", "kettle", "key",
+  "keyboard", "kite", "kitten", "knot", "lamp", "laptop", "lock", "log", "luggage",
+  "machine", "magazine", "magnet", "mail", "map", "mask", "mattress", "mirror",
+  "mobile", "monitor", "net", "nut", "oven", "package", "pad", "page", "paint",
+  "pan", "panel", "passport", "pen", "pencil", "penny", "photo", "piano", "pillow",
+  "pin", "pipe", "plane", "planet", "plastic", "pocket", "pot", "prison", "prize",
+  "radio", "rail", "razor", "rock", "rope", "roof", "room", "rubber", "sail",
+  "screen", "sheet", "shelf", "shell", "ship", "shirt", "shoe", "shop", "sign",
+  "silk", "sink", "skirt", "sleeve", "soap", "sock", "sofa", "stamp", "stick",
+  "stove", "string", "suitcase", "sword", "tail", "tank", "tape", "tent", "ticket",
+  "tile", "tissue", "towel", "toy", "train", "tray", "truck", "tube", "umbrella",
+  "van", "vase", "vehicle", "wallet", "wardrobe", "wheel", "whistle", "window",
+  "wine", "wing", "wire", "wool",
+  // places & travel
+  "station", "airport", "highway", "tunnel", "path", "journey", "trip",
+  "restaurant", "bus", "engine", "driver",
+  // people & family
+  "mother", "woman", "brother", "sister", "daughter", "cousin", "nephew", "niece",
+  "uncle", "aunt", "husband", "grandmother", "grandfather", "family", "guest",
+  "neighbor", "twin", "stranger", "adult", "crowd", "audience", "citizen",
+  "colleague", "boss", "employee", "employer", "captain", "mayor", "judge",
+  "lawyer", "nurse", "dentist", "engineer", "scientist", "pupil", "poet", "poem",
+  "poetry", "author", "artist", "actor", "farmer", "soldier", "writer", "singer",
+  "sailor", "hero", "giant", "ghost", "enemy", "partner", "manager", "officer",
+  "servant", "governor", "youth", "sir", "lady", "queen", "prince", "princess",
+  "guard", "cook", "clerk",
+  // society & feelings
+  "army", "navy", "peace", "battle", "defeat", "defense", "election", "government",
+  "freedom", "justice", "liberty", "crime", "trial", "guilt", "witness", "evidence",
+  "clue", "rumor", "secret", "lie", "honor", "pride", "shame", "pity", "faith",
+  "doubt", "belief", "hope", "fear", "joy", "grief", "comfort", "despair", "anger",
+  "temper", "mood", "panic", "stress", "silence", "noise", "accent", "sound",
+  "risk", "skill",
+  // sports & games
+  "sport", "soccer", "tennis", "golf", "coach", "goal", "race", "score", "joke",
+  "quiz",
+  // everyday verbs
+  "answer", "agree", "allow", "accept", "argue", "arrive", "believe", "belong",
+  "bend", "bite", "borrow", "bounce", "breathe", "bring", "burn", "buy", "carry",
+  "catch", "chase", "check", "cheer", "chew", "clap", "clean", "climb", "compare",
+  "compete", "complain", "complete", "connect", "continue", "copy", "count",
+  "cover", "crack", "crash", "create", "cross", "cry", "cut", "dance", "deliver",
+  "deny", "depend", "destroy", "dig", "disappear", "discover", "dive", "divide",
+  "draw", "dream", "dress", "drink", "drive", "drop", "earn", "eat", "employ",
+  "encourage", "enjoy", "enter", "escape", "examine", "excite", "exercise",
+  "exist", "expect", "explain", "fail", "fall", "feed", "fill", "fit", "fix",
+  "float", "flow", "fly", "fold", "forget", "forgive", "gain", "gather", "greet",
+  "grow", "guide", "handle", "hang", "happen", "harm", "hate", "heal", "hide",
+  "hire", "hit", "hunt", "hurry", "hurt", "ignore", "include", "invent", "invite",
+  "join", "jump", "kick", "kill", "kiss", "knock", "laugh", "launch", "lean",
+  "learn", "lend", "let", "lift", "listen", "load", "lose", "manage", "marry",
+  "measure", "melt", "mention", "miss", "mix", "observe", "obtain", "occur",
+  "offer", "pass", "pay", "perform", "pick", "plant", "pour", "predict", "prefer",
+  "prepare", "press", "prevent", "print", "produce", "promise", "protect",
+  "provide", "punish", "pull", "push", "raise", "reach", "receive", "recognize",
+  "reduce", "refuse", "regard", "relax", "release", "remain", "remind", "repeat",
+  "replace", "reply", "rescue", "respect", "rest", "retire", "return", "reveal",
+  "review", "reward", "ride", "ring", "rise", "rob", "roll", "rub", "rule", "rush",
+  "save", "scare", "scratch", "scream", "search", "seek", "sell", "send", "serve",
+  "settle", "shake", "share", "shine", "shock", "shoot", "shout", "shut", "signal",
+  "sing", "sink", "sit", "skate", "ski", "skip", "sleep", "slip", "smell", "smile",
+  "smoke", "sort", "speak", "spell", "spend", "spill", "split", "spoil", "spread",
+  "squeeze", "stare", "start", "stay", "steal", "steer", "stir", "stretch",
+  "strike", "strip", "stroke", "struggle", "suffer", "suggest", "supply", "surf",
+  "swallow", "sweep", "swim", "swing", "switch", "talk", "taste", "teach", "tend",
+  "throw", "tie", "toss", "touch", "travel", "treat", "trust", "try", "twist",
+  "undo", "unite", "unlock", "update", "urge", "vanish", "vary", "wait", "wake",
+  "walk", "warn", "wash", "waste", "watch", "wear", "weigh", "whisper", "win",
+  "wipe", "wish", "wonder", "wrap", "yawn", "yell", "zoom", "recover", "refer",
+  "reflect", "rely", "repair", "respond", "scan",
+  // greetings, politeness, small talk
+  "yes", "okay", "hello", "goodbye", "please", "thank", "sorry", "maybe",
+  "perhaps", "probably", "certainly", "really", "quite", "rather", "almost",
+  "nearly", "hardly", "barely", "mostly", "mainly", "usually", "often",
+  "sometimes", "rarely", "seldom", "frequently", "generally", "typically",
+  "particularly", "exactly", "simply", "yet", "already", "ago", "soon", "later",
+  "today", "tonight", "else", "everywhere", "somewhere", "anywhere", "nowhere",
+  "beside", "besides", "despite", "toward", "within", "beyond", "among", "along",
+  "across", "behind", "below", "above", "near", "far", "inside", "outside",
+  "forever", "twice",
+  // time & schedule
+  "week", "date", "calendar", "afternoon", "evening", "night", "future", "past",
+  "century", "decade",
+  // school, work & modern life
+  "lesson", "homework", "exam", "grade", "essay", "meeting", "task", "email",
+  "message", "internet", "password", "account", "client", "sale", "discount",
+  "cash", "wage", "salary", "profit", "loss", "debt", "loan", "budget",
+  "customer", "store", "example", "explore", "express", "extra", "index", "size",
+  "link", "object", "subject", "major", "minor", "quote", "query", "queue",
+  "quarter", "dozen", "hundred", "thousand", "million", "eleven", "twelve",
+  "twenty", "fifty", "us",
+  // descriptors
+  "bad", "big", "final", "middle", "front", "top", "left", "straight", "round",
+  "square", "deep", "wide", "narrow", "thick", "thin", "tall", "short", "low",
+  "flat", "steep", "rough", "soft", "sharp", "sweet", "sour", "bitter", "fresh",
+  "dirty", "wet", "dry", "hot", "cold", "cool", "loud", "dark", "heavy", "empty",
+  "full", "rich", "poor", "weak", "strong", "sick", "tired", "angry", "sad",
+  "funny", "serious", "rude", "honest", "fair", "busy", "free", "safe", "wild",
+  "shy", "jealous", "clever", "smart", "stupid", "modern", "fast", "slow",
+  "cheap", "expensive", "rare", "special", "plain", "fancy", "simple", "easy",
+  "likely", "ready", "hard", "amazing", "several", "plenty", "half", "single",
+  "double", "third",
+];
+
+// The full everyday pool: core + extended, deduplicated at module load.
+// (A few words also appear in HARD_WORDS below — that is fine; the adaptive
+// generator dedupes the merged pool it scores.)
+export const COMMON_WORDS: string[] = Array.from(
+  new Set([...CORE_WORDS, ...EXTENDED_WORDS])
+);
+
 export const HARD_WORDS: string[] = [
   "algorithm", "architecture", "beautiful", "boundary", "challenge", "character", "complexity",
   "conscious", "curious", "dangerous", "definition", "deliberate", "description", "determined",
@@ -88,6 +245,55 @@ export const HARD_WORDS: string[] = [
   "volunteer", "wander", "warning", "waterfall", "weather", "wedding", "weekend", "welcome",
   "welfare", "western", "whereas", "willing", "wisdom", "wonderful", "workshop", "worried",
   "worthwhile", "writing", "yesterday",
+  // extended difficulty pool (longer / lower-frequency words, incl. more rare
+  // letter carriers: acquire, justify, exquisite-style q/x/z coverage)
+  "abandon", "absorb", "abstract", "abundant", "accurate", "achieve", "acquire",
+  "adapt", "adequate", "adjust", "admire", "adopt", "advocate", "aggressive",
+  "alliance", "ambition", "analyze", "ancestor", "announce", "annual",
+  "anticipate", "apparent", "appeal", "appetite", "applaud", "appreciate",
+  "approach", "appropriate", "approve", "arbitrary", "architect", "arrange",
+  "arrogant", "aspect", "assemble", "assess", "asset", "assign", "assist",
+  "assume", "assure", "atmosphere", "attach", "attain", "attempt", "attorney",
+  "authentic", "authority", "automatic", "bargain", "betray", "bizarre",
+  "blossom", "brilliant", "calculate", "capable", "catastrophe", "cautious",
+  "cease", "ceremony", "certify", "champion", "chaos", "characteristic",
+  "cherish", "chronic", "circumstance", "clarify", "collaborate", "collapse",
+  "compassion", "compensate", "competent", "compile", "conceive", "confront",
+  "conscience", "consensus", "conserve", "consistency", "constant",
+  "contemporary", "controversy", "coordinate", "corporate", "criterion",
+  "crucial", "cultivate", "curriculum", "decisive", "dedicate", "definite",
+  "delicate", "demonstrate", "desperate", "devise", "diagnose", "dignity",
+  "dilemma", "diligent", "dismiss", "dispose", "disrupt", "distinct",
+  "distinguish", "distort", "distribute", "diverse", "domain", "domestic",
+  "dominant", "donate", "dramatic", "drastic", "dynamic", "elaborate",
+  "elastic", "eliminate", "embrace", "emerge", "emission", "emphasize",
+  "encounter", "endure", "enhance", "enormous", "enrich", "ensure",
+  "enthusiasm", "entrepreneur", "equivalent", "essence", "evaluate", "evident",
+  "exaggerate", "exceed", "exception", "excessive", "exclude", "execute",
+  "exhaust", "exotic", "explicit", "exposure", "extreme", "feasible", "flaw",
+  "flexible", "formulate", "fragile", "framework", "friction", "fulfill",
+  "fundamental", "generate", "genuine", "glimpse", "gorgeous", "gracious",
+  "gradual", "grateful", "gravity", "guardian", "handful", "harsh", "hesitate",
+  "highlight", "hostile", "identical", "illusion", "immense", "immune",
+  "implement", "impose", "impulse", "incentive", "incredible", "inevitable",
+  "infect", "infinite", "infrastructure", "inherent", "inherit", "innocent",
+  "innovative", "inspire", "install", "instinct", "instruct", "integrate",
+  "integrity", "intense", "interfere", "intermediate", "internal", "interpret",
+  "intricate", "isolate", "justify", "legitimate", "magnificent", "maintain",
+  "merge", "migrate", "milestone", "modify", "motivate", "mutual", "negotiate",
+  "neutral", "notable", "notorious", "nourish", "organize", "overlap",
+  "overwhelm", "paradox", "peculiar", "portable", "pragmatic", "preliminary",
+  "prevail", "primitive", "proceed", "proficiency", "profound", "prominent",
+  "prospect", "prosper", "protocol", "provoke", "pursuit", "qualify",
+  "radical", "random", "rational", "refine", "reinforce", "resilient",
+  "resolve", "restrain", "restrict", "retrieve", "rigid", "rigorous", "robust",
+  "scatter", "sensation", "sentiment", "shatter", "simulate", "skeptical",
+  "sophisticated", "span", "speculate", "sphere", "spontaneous", "tactic",
+  "texture", "threshold", "toxic", "transaction", "transmit", "transparent",
+  "trivial", "ultimate", "underlying", "undermine", "unfold", "uniform",
+  "utilize", "vague", "validate", "verdict", "verify", "versatile", "vibrant",
+  "vicious", "villain", "vintage", "violate", "virtual", "vulnerable",
+  "withstand", "yield",
 ];
 
 // Short-to-medium famous quotes for quote mode.
@@ -113,4 +319,15 @@ export const QUOTES: Quote[] = [
   { text: "Mistakes are the portals of discovery. Every error you study becomes a lesson; every lesson becomes speed.", author: "James Joyce" },
   { text: "You miss one hundred percent of the shots you do not take. Show up, press the keys, and let practice decide.", author: "Wayne Gretzky" },
   { text: "The mind is not a vessel to be filled but a fire to be kindled. Feed it small challenges every single day.", author: "Plutarch" },
+  { text: "Well begun is half done.", author: "Aristotle" },
+  { text: "Fortune favors the bold.", author: "Virgil" },
+  { text: "Actions speak louder than words.", author: "Proverb" },
+  { text: "Where there is a will, there is a way.", author: "Proverb" },
+  { text: "Knowledge is power.", author: "Francis Bacon" },
+  { text: "The best way out is always through.", author: "Robert Frost" },
+  { text: "Slow and steady wins the race.", author: "Aesop" },
+  { text: "It does not matter how slowly you go as long as you do not stop.", author: "Confucius" },
+  { text: "An investment in knowledge pays the best interest.", author: "Benjamin Franklin" },
+  { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
+  { text: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
 ];

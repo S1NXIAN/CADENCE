@@ -139,3 +139,20 @@ Stage Summary:
 - Restart/new-test now snaps instead of gliding; corrupt or hand-edited localStorage/backups can no longer crash the app; adaptive tests contain exactly the requested word count; keypress sound survives autoplay suspension.
 - Verified files: src/components/typing/word-display.tsx, src/lib/typing/storage.ts, src/lib/typing/generator.ts, src/app/page.tsx.
 - New tooling: scripts/probe-retire-transient.sh, probe-retire2.sh, probe-restart.sh (rAF transition-integrity probes), scripts/check-generator.ts (count integrity), all reusable.
+
+---
+Task ID: 8
+Agent: Super Z (main agent)
+Task: User asked whether the dictionary is dynamic or static/hardcoded, worried about repetitiveness and insufficient word supply for adaptive mode.
+
+Work Log:
+- Answered the question: dictionary is 100% static/hardcoded in src/lib/typing/words.ts (local-first design — no network fetches). Quantified the worry with a new audit tool (scripts/dict-audit.ts) measuring pool sizes, duplicates, per-letter coverage, repetition math, and adaptive drill-window capacity.
+- Audit findings (before): COMMON 521 entries (1 accidental dup "eager"), HARD 275, ~790-word adaptive pool. Time mode repeats 22% of words at 60s and 38% at 120s. Rare letters starved: j:9, x:9, q:14, z:14, k:32 carrier words — a typist weak on "q" would recycle the same 14 words every drill. Everyday basics missing entirely (big, bad, night, week, cat, fish, egg, milk, window, kitchen, mother, risk, skill) — the thematic tail (animals/NATO alphabet/adjectives) had crowded them out.
+- Expansion (words.ts restructured): COMMON_WORDS split into CORE_WORDS (original 521) + EXTENDED_WORDS (~810 curated additions banded by theme: animals/nature/food/body/household/places/people/society/verbs/descriptors — 15 commented bands); COMMON_WORDS = dedup union via Set at module load. HARD_WORDS +285 additions (longer/lower-frequency words, chosen to also lift rare-letter carriers). QUOTES 16 → 27 (well-known short aphorisms/proverbs). File header documents sizing rationale.
+- generator.ts: adaptive merged pool now deduped (5 words existed in both lists — information/research/experience/society/performance — and would double-count in the drill-candidate window).
+- Verification: dict-audit after → COMMON 1471 unique (+950), HARD 560 (+285), zero duplicates, all /^[a-z]+$/; rare letters now q:28 x:42 j:31 z:30 k:124 (all ≥2×); repetition: 25-word tests 0.6→0.2 expected repeats, 60s time mode 22%→9%, 120s 38%→17%; adaptive drill window 358→913 distinct candidates. check-generator.ts 68/68 PASS (count integrity all modes × counts × intensities). tsc clean (src; remaining repo errors are pre-existing in examples/ + skills/, untouched), eslint clean. Browser smoke (scripts/smoke-dict.sh): words/adaptive/quote modes render valid words from the new pool (new words confirmed live: television, evident, depend, refer), typing works, stream alive. New reusable tooling: scripts/dict-audit.ts, scripts/smoke-dict.sh.
+
+Stage Summary:
+- Dictionary stays static (correct for local-first) but is now ~2.5x deeper: 1471 common + 560 hard unique words, 27 quotes. Repetition in long/time tests roughly halved; adaptive mode has 2.5x the drill candidates and no starved letters. Bundle cost ~26KB raw for the whole dictionary (single local file, no network).
+- Files: src/lib/typing/words.ts (restructured + expanded), src/lib/typing/generator.ts (1-line pool dedupe). New tools: scripts/dict-audit.ts, scripts/smoke-dict.sh.
+- Not done (deliberate): dynamic/network dictionaries would break local-first; a user-defined custom word list remains the natural future extension if more variety is ever wanted.
