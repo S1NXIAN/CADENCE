@@ -116,3 +116,26 @@ Work Log:
 Stage Summary:
 - All Cadence opacity-modified utilities now real (theme-registered tokens); skipped-letter feedback is a muted mauve "blur" instead of accidentally full-white.
 - Files: src/app/globals.css (theme registration), src/components/typing/word-display.tsx (text-missed). Visual side effect: several UI elements regain their intended lime tint (mode button, PB badge, active underline, settings options).
+
+---
+Task ID: 7
+Agent: Super Z (main agent)
+Task: User request — "Review the current codebase and implementation, troubleshoot potential issues, and continue improving the engineering details."
+
+Work Log:
+- Full codebase audit (all 14 app files): typing session hook, word display, page shell, generator, profiles/insights, storage, results/stats/settings/palette components, charts, globals.css.
+- Built a per-frame rAF probe (scripts/probe-retire-transient.sh, probe-retire2.sh, probe-restart.sh) because the settled-state e2e (350ms sleep before sampling) can never see 150ms transitions. Two key findings:
+  1. EXONERATED the Task-5 whole-line window retire: at both retires (winStart 0→9→15 in time mode) translateY never moved, the active word never jumped, caret deviation stayed ≤12px. The >12px caret deviations that DO exist (~84px decaying over 120ms) are the two DESIGNED line-crossing caret glides.
+  2. CONFIRMED a real defect: Tab/new-test GLIDE — after restart, the stream's translateY animated -80→0 over ~200ms (7 interpolated frames) because the scrollY rewind fires the inner stream's transition-transform (and the caret's top transition) from the stale scroll position. Every restart visibly slid.
+- Fixes:
+  - word-display.tsx: new snapUi state — suspends the stream's transform transition AND the caret's left/top transition for exactly one commit, set (a) on fresh word list (restart/mode change → instant snap to top) and (b) defensively on window-retire commits; re-enabled via double-rAF after the snap frame paints (geometry at rest → re-adding transition animates nothing). Real line-crossing scrolls keep their designed 150ms glide.
+  - storage.ts: untrusted-input sanitizers (sanitizeSettings/sanitizeLearning/sanitizeStats) now guard localStorage loads AND importData — validated enums (mode/accent/caretStyle), clamped numerics, shape-checked objects/arrays. Previously mode:"bogus" fell through generateTest()'s switch → undefined test → full app crash on next render; non-object keyProfiles would throw in computeWeakKeys.
+  - generator.ts: adaptive drill loop pushed non-unique picks, so a test could exceed the requested count ("adaptive 25" with 27 words, label/PB key mismatch). Now only unique picks push → count integrity verified: 68-check bun script (scripts/check-generator.ts) across counts 10/25/50/100 × intensities 0/25/65/100 × signal/empty learning → all exact, 0 adjacent duplicates.
+  - page.tsx: resume() a suspended AudioContext inside the keystroke gesture (autoplay policy could silence keypress sound permanently after tab background).
+- Regression evidence: probe-restart post-fix = ty -80→0 in ONE frame, 0 interpolated frames. probe-retire2 post-fix identical to pre-fix baseline (retires pixel-invisible). Full e2e-scroll-fix.sh (ran 45-word time mode — settings persisted from probe session, bonus coverage) → 0 backward scrolls, 0 rewraps, 0 caret mispositions, PASS. Corrupt-storage browser check: poisoned localStorage (bogus mode, -50 count, 9999 intensity, wrong-typed arrays) → app boots, falls back to defaults, clamps ranges, re-persists sanitized values. tsc + eslint clean.
+- Kept as-is (reviewed, deliberately not changed): PB stamping duplicated between page.tsx handleFinish and recordResult (consistent, harmless); time-mode premature finish if stream exhausted (needs >330wpm — unrealistic); 0.5px lineH measurement artifact (self-consistent within the compensation math); caret line-crossing glide (designed, Monkeytype-like).
+
+Stage Summary:
+- Restart/new-test now snaps instead of gliding; corrupt or hand-edited localStorage/backups can no longer crash the app; adaptive tests contain exactly the requested word count; keypress sound survives autoplay suspension.
+- Verified files: src/components/typing/word-display.tsx, src/lib/typing/storage.ts, src/lib/typing/generator.ts, src/app/page.tsx.
+- New tooling: scripts/probe-retire-transient.sh, probe-retire2.sh, probe-restart.sh (rAF transition-integrity probes), scripts/check-generator.ts (count integrity), all reusable.

@@ -72,6 +72,10 @@ export default function Page() {
       const AudioCtor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       audioCtxRef.current ??= new AudioCtor();
       const ctx = audioCtxRef.current;
+      // autoplay policy can suspend the context (tab backgrounded, before
+      // first gesture) — revive it inside the keystroke gesture or the click
+      // would stay silent forever
+      if (ctx.state === "suspended") void ctx.resume().catch(() => {});
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.frequency.value = correct ? 660 : 250;

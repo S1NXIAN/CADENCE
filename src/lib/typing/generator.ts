@@ -113,11 +113,16 @@ function generateAdaptive(
   let guard = 0;
   while (drillSet.size < targetDrill && guard < 500) {
     const candidate = drillCandidates[rand(drillCandidates.length)].word;
-    // avoid same word twice in a row
-    if (words[words.length - 1] !== candidate) {
-      drillSet.add(candidate);
-      words.push(candidate);
+    // count integrity: only UNIQUE picks may be pushed, otherwise the drill
+    // loop overshoots and the finished test has more words than requested
+    // ("adaptive 25" that actually contains 27 words). Adjacent duplicates
+    // are skipped too, to avoid immediate repetition.
+    if (drillSet.has(candidate) || words[words.length - 1] === candidate) {
+      guard++;
+      continue;
     }
+    drillSet.add(candidate);
+    words.push(candidate);
     guard++;
   }
 

@@ -1,29 +1,49 @@
-WORDS: symbol|shadow|keen|new|space|and|determined|present|president|professional|situated|be|student|difference|action|hypothesis|crisp|word|settlement|sparrow|lot|golden|not|go|price
-TOTAL=25
-word 1 ('symbol') ty=0 from=0 rewrap=0 caret=OK backward=0
+WORDS: policy|shadow|because|rabbit|bright|may|consider|back|computer|when|dog|a|lima|panda|high|eye|product|figure|heart|next|death|road|study|while|should|girl|panda|river|tell|and|letter|force|on|parent|record|with|whale|could|general|power|he|i|charlie|bright|large
+TOTAL=45
+word 1 ('policy') ty=0 from=0 rewrap=0 caret=OK backward=0
 word 2 ('shadow') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 3 ('keen') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 4 ('new') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 5 ('space') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 6 ('and') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 7 ('determined') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 8 ('present') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 9 ('president') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 10 ('professional') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 11 ('situated') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 12 ('be') ty=-80 from=0 rewrap=0 caret=OK backward=0
-word 13 ('student') ty=-80 from=0 rewrap=0 caret=OK backward=0
-word 14 ('difference') ty=-80 from=0 rewrap=0 caret=OK backward=0
-word 15 ('action') ty=-80 from=0 rewrap=0 caret=OK backward=0
-word 16 ('hypothesis') ty=-80 from=0 rewrap=0 caret=OK backward=0
-word 17 ('crisp') ty=-80 from=0 rewrap=0 caret=OK backward=0
-word 18 ('word') ty=-80 from=7 rewrap=0 caret=OK backward=0
-word 19 ('settlement') ty=-80 from=7 rewrap=0 caret=OK backward=0
-word 20 ('sparrow') ty=-80 from=7 rewrap=0 caret=OK backward=0
-word 21 ('lot') ty=-80 from=7 rewrap=0 caret=OK backward=0
-word 22 ('golden') ty=-80 from=7 rewrap=0 caret=OK backward=0
-word 23 ('not') ty=-80 from=7 rewrap=0 caret=OK backward=0
-word 24 ('go') ty=-80 from=7 rewrap=0 caret=OK backward=0
-word 25 ('price') -> results screen
+word 3 ('because') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 4 ('rabbit') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 5 ('bright') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 6 ('may') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 7 ('consider') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 8 ('back') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 9 ('computer') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 10 ('when') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 11 ('dog') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 12 ('a') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 13 ('lima') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 14 ('panda') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 15 ('high') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 16 ('eye') ty=-80 from=0 rewrap=0 caret=OK backward=0
+word 17 ('product') ty=-80 from=0 rewrap=0 caret=OK backward=0
+word 18 ('figure') -> results screen
+word 19 ('heart') -> results screen
+word 20 ('next') -> results screen
+word 21 ('death') -> results screen
+word 22 ('road') -> results screen
+word 23 ('study') -> results screen
+word 24 ('while') -> results screen
+word 25 ('should') -> results screen
+word 26 ('girl') -> results screen
+word 27 ('panda') -> results screen
+word 28 ('river') -> results screen
+word 29 ('tell') -> results screen
+word 30 ('and') -> results screen
+word 31 ('letter') -> results screen
+word 32 ('force') -> results screen
+word 33 ('on') -> results screen
+word 34 ('parent') -> results screen
+word 35 ('record') -> results screen
+word 36 ('with') -> results screen
+word 37 ('whale') -> results screen
+word 38 ('could') -> results screen
+word 39 ('general') -> results screen
+word 40 ('power') -> results screen
+word 41 ('he') -> results screen
+word 42 ('i') -> results screen
+word 43 ('charlie') -> results screen
+word 44 ('bright') -> results screen
+word 45 ('large') -> results screen
 
 RESULT: backward_scroll_events=0 rewrap_events=0 caret_mispositioned=0

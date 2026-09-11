@@ -48,12 +48,21 @@ export function WordDisplay({
   // keystroke, which makes the top line visibly reshuffle mid-test.
   const [winStart, setWinStart] = useState(0);
   const [prevWords, setPrevWords] = useState(words);
+  // when true, the stream's transform transition and the caret's left/top
+  // transition are suspended for ONE commit. Geometric compensations (window
+  // retire, restart rewind) must land instantly — if they animate, the
+  // stream reflows immediately while the transform/caret glide behind, and
+  // the whole visible block jumps a full line for ~150ms.
+  const [snapUi, setSnapUi] = useState(false);
 
   // adjust-during-render (react.dev "storing information from previous
   // renders"): a fresh word list (new test / restart) rewinds the window.
   if (prevWords !== words) {
     setPrevWords(words);
     setWinStart(0);
+    // restart: scrollY derived from the stale caret would otherwise animate
+    // the stream from the old scroll position back to the top — snap instead.
+    setSnapUi(true);
   }
   // backspace can walk the cursor above the window (ctrl+backspace pops
   // words) — rewind so the active word stays rendered. Re-wrapping is
@@ -123,6 +132,9 @@ export function WordDisplay({
           height,
           width: Math.max(elRect.width * 0.55, 4),
         });
+        // the retire shifts the stream one line the instant the removed words
+        // leave the DOM; the caret compensation must not glide behind it
+        setSnapUi(true);
         return;
       }
     }
@@ -161,6 +173,21 @@ export function WordDisplay({
   useEffect(() => {
     if (focusSignal > 0) inputRef.current?.focus();
   }, [focusSignal]);
+
+  // re-enable transitions one PAINTED frame after a snap commit (double rAF).
+  // Geometry is already at rest when this runs, so re-adding the transition
+  // animates nothing — later real scrolls glide as usual.
+  useEffect(() => {
+    if (!snapUi) return;
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => setSnapUi(false));
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [snapUi]);
 
   const caretStyle =
     settings.caretStyle === "block"
@@ -235,7 +262,9 @@ export function WordDisplay({
       >
         <div
           ref={innerRef}
-          className="relative px-1 font-mono transition-transform duration-150 ease-out"
+          className={`relative px-1 font-mono ${
+            snapUi ? "" : "transition-transform duration-150 ease-out"
+          }`}
           style={{
             transform: `translateY(-${scrollY}px)`,
             fontSize: "var(--word-size)",
@@ -253,7 +282,7 @@ export function WordDisplay({
                 top: `${caretStyle.top}px`,
                 width: `${caretStyle.width}px`,
                 height: `${caretStyle.height}px`,
-                transition: "left 90ms linear, top 120ms ease-out",
+                transition: snapUi ? "none" : "left 90ms linear, top 120ms ease-out",
                 borderRadius: settings.caretStyle === "block" ? 2 : 1,
               }}
             />
