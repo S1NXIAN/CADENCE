@@ -63,3 +63,21 @@ Stage Summary:
 - Feature 1 (key-finding latency): was already fully implemented and surfaced — confirmed correct, untouched.
 - Feature 2 (error context): now measured at both bigram (transition error rate + latency → weakness → curation) and trigram (2-keys-before-mistake contexts → coach notes) levels; fixed dead bigram errRate bug.
 - Rejected as redundant: everything else (progressive letter unlock = keybr-style curriculum is redundant with Cadence's real-word adaptive curation; missed-word practice mode redundant with auto-curated adaptive mode; pseudo-words rejected to keep real-word flow).
+
+---
+Task ID: 4
+Agent: Super Z (main agent)
+Task: User reported a bug via screen recording (29s webm): during a 25-word test the word stream visibly jumps backward/forward and the caret detaches from the active word.
+
+Work Log:
+- Frame-by-frame analysis of the recording (extracted 29 frames @1fps): confirmed the view oscillates — at words 14→16 the stream scrolled BACKWARD revealing earlier words, caret rendered after "funky" while the user was typing "step" (6 words behind); self-corrected, regressed again at word 22. Results screen itself was fine.
+- Root cause in src/components/typing/word-display.tsx: the caret's top was measured via elRect.top - OUTER.getBoundingClientRect().top (viewport space, i.e. AFTER the translateY scroll). scrollY was then derived from that measurement (activeLine = round(caret.top/lineH)) → feedback loop: caret → activeLine → scrollY → caret. With the active word on stream line 3 the system hit a stable 2-cycle (scrollY 0 ↔ 1 line) that flip-flopped on every keystroke. The caret div is a child of the transformed inner stream but was fed outer-relative coordinates → it drifted off the active word whenever scrollY ≠ 0.
+- Fix: measure the caret in the INNER stream's coordinate space (elRect.top - innerRect.top). Inner-relative tops are invariant to the transform, so activeLine is always the true absolute line; scrollY = max(0, activeLine-1)*lineH is now monotonic (0 → -lineH once) and the caret coordinates are in the same space the caret div is drawn in.
+- Bonus fix found during verification: word spans (inline-block, full 80px line-height + pb + border) put the active-word underline ~24px below the glyphs (the floating line visible in the user's video) and inflated line stride to 84px, clipping the 3rd line. Added leading-[1.1] to the word span → underline hugs the text, stride back to exactly 80px (5rem).
+- Regression harness scripts/e2e-scroll-fix.sh: types a full 25-word test at 1366x768 (user's screen) via agent-browser, sampling computed translateY of the stream + caret-vs-active-word rects after every submitted word. Old code: 3 backward scrolls + 3 caret mispositions (oscillation reproduced). Fixed code: 0 backward scrolls, 0 mispositions, single scroll event ty 0 → -80 at word 15, PASS.
+- Cross-breakpoint sanity: 390x844 (underline snug, 3 lines) and 1920x1080 (4-line mode, no clipping). tsc (src) clean, eslint clean, dev.log clean.
+
+Stage Summary:
+- Word-stream scroll oscillation + detached caret eliminated (measurement made scroll-invariant); active-word underline now hugs the text; line stride exact at 80px so the 3-line viewport no longer clips.
+- Verified files: src/components/typing/word-display.tsx only.
+- Regression script kept at scripts/e2e-scroll-fix.sh for future scroll/caret changes.

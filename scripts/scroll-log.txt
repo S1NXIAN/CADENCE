@@ -1,0 +1,29 @@
+WORDS: get|song|proud|presence|star|both|science|those|before|interesting|wonderful|sugar|foot|smooth|issue|sensitive|sturdy|college|office|law|pasta|somebody|program|calm|city
+TOTAL=25
+word 1 ('get') ty=0 caret=OK backward=0
+word 2 ('song') ty=0 caret=OK backward=0
+word 3 ('proud') ty=0 caret=OK backward=0
+word 4 ('presence') ty=0 caret=OK backward=0
+word 5 ('star') ty=0 caret=OK backward=0
+word 6 ('both') ty=0 caret=OK backward=0
+word 7 ('science') ty=0 caret=OK backward=0
+word 8 ('those') ty=0 caret=OK backward=0
+word 9 ('before') ty=0 caret=OK backward=0
+word 10 ('interesting') ty=0 caret=OK backward=0
+word 11 ('wonderful') ty=0 caret=OK backward=0
+word 12 ('sugar') ty=0 caret=OK backward=0
+word 13 ('foot') ty=0 caret=OK backward=0
+word 14 ('smooth') ty=-80 caret=OK backward=0
+word 15 ('issue') ty=-80 caret=OK backward=0
+word 16 ('sensitive') ty=-80 caret=OK backward=0
+word 17 ('sturdy') ty=-80 caret=OK backward=0
+word 18 ('college') ty=-80 caret=OK backward=0
+word 19 ('office') ty=-80 caret=OK backward=0
+word 20 ('law') ty=-80 caret=OK backward=0
+word 21 ('pasta') ty=-80 caret=OK backward=0
+word 22 ('somebody') ty=-80 caret=OK backward=0
+word 23 ('program') ty=-80 caret=OK backward=0
+word 24 ('calm') ty=-80 caret=OK backward=0
+word 25 ('city') -> results screen
+
+RESULT: backward_scroll_events=0 caret_mispositioned=0

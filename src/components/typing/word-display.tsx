@@ -52,9 +52,8 @@ export function WordDisplay({
 
   // measure caret position after every render that affects it
   useLayoutEffect(() => {
-    const outer = outerRef.current;
     const inner = innerRef.current;
-    if (!outer || !inner) return;
+    if (!inner) return;
 
     const target = inner.querySelector<HTMLElement>(`[data-wi="${wordIndex}"]`);
     if (!target) return;
@@ -62,14 +61,21 @@ export function WordDisplay({
     const el = chars[Math.min(input.length, Math.max(chars.length - 1, 0))];
     if (!el) return;
 
-    const outerRect = outer.getBoundingClientRect();
+    // Measure in the INNER stream's coordinate space. The stream is
+    // translated by scrollY, so measuring against the outer viewport would
+    // feed the current scroll offset back into the scroll computation
+    // (caret → activeLine → scrollY → caret) and make the view oscillate
+    // whenever the active word sits on a scrolled-in line. Inner-relative
+    // coordinates are invariant to the transform, so the active line is
+    // always the true absolute line of the word in the stream.
+    const innerRect = inner.getBoundingClientRect();
     const elRect = el.getBoundingClientRect();
     const isPastEnd = input.length >= chars.length;
 
     const left = isPastEnd
-      ? elRect.right - outerRect.left + 1
-      : elRect.left - outerRect.left - 1;
-    const top = elRect.top - outerRect.top;
+      ? elRect.right - innerRect.left + 1
+      : elRect.left - innerRect.left - 1;
+    const top = elRect.top - innerRect.top;
     const height = elRect.height;
 
     setCaret((prev) =>
@@ -231,7 +237,7 @@ export function WordDisplay({
               <span
                 key={wi}
                 data-wi={wi}
-                className={`mr-[0.6ch] inline-block border-b-2 pb-[2px] ${
+                className={`mr-[0.6ch] inline-block leading-[1.1] border-b-2 pb-[2px] ${
                   isCurrent ? "border-hue/50" : "border-transparent"
                 }`}
               >
