@@ -10,11 +10,17 @@ import type {
 import {
   computeWeakKeys,
   personalMedianLatency,
-  topConfusions,
   topErrorContexts,
   weakBigrams,
 } from "./profiles";
 import { memRetrievability } from "./memory";
+import {
+  analyzeCurve,
+  analyzeEvents,
+  HESITATION_MS,
+  type CurveAnalysis,
+  type EventAnalysis,
+} from "./audit";
 
 /**
  * Coach engine v2 — "observant, not generic".
@@ -32,189 +38,6 @@ import { memRetrievability } from "./memory";
  * the same observation. Phrase variants rotate deterministically per test
  * (hash of result id) so consecutive similar tests don't read identically.
  */
-
-// ---------------------------------------------------------------------------
-// Per-test keystroke forensics
-// ---------------------------------------------------------------------------
-
-const HESITATION_MS = 900;
-const LAT_MAX = 2000; // pauses longer than this are thinking, not typing
-const TRACK_RE = /[a-z0-9';.,!?-]/i;
-
-interface EventAnalysis {
-  keystrokes: number;
-  errors: number;
-  missed: number; // expected chars that never landed (synthetic "" events)
-  extra: number; // chars typed past the end of a word
-  confusions: Map<string, number>; // "e>r" -> count, this test
-  focusSlips: Map<string, number>; // focus key -> error count, this test
-  latencies: Map<string, number[]>; // pressed key -> ms samples, this test
-  hesitations: Array<{ ch: string; ms: number }>; // pauses >= HESITATION_MS
-}
-
-function analyzeEvents(events: CharEvent[], focusKeys: string[]): EventAnalysis {
-  const a: EventAnalysis = {
-    keystrokes: events.length,
-    errors: 0,
-    missed: 0,
-    extra: 0,
-    confusions: new Map(),
-    focusSlips: new Map(),
-    latencies: new Map(),
-    hesitations: [],
-  };
-  const focus = new Set(focusKeys);
-  let prevT: number | null = null;
-  let prevCorrect = false;
-
-  for (const ev of events) {
-    const typedTracked = ev.typed.length === 1 && TRACK_RE.test(ev.typed);
-
-    // inter-key latency on clean presses (mirrors profiles.ingestEvents rules)
-    if (ev.correct && typedTracked && prevT !== null && prevCorrect) {
-      const d = ev.t - prevT;
-      if (d > 20 && d < LAT_MAX) {
-        const k = ev.typed.toLowerCase();
-        const arr = a.latencies.get(k);
-        if (arr) arr.push(d);
-        else a.latencies.set(k, [d]);
-      }
-      if (d >= HESITATION_MS) a.hesitations.push({ ch: ev.typed, ms: d });
-    }
-
-    if (!ev.correct) {
-      a.errors += 1;
-      if (ev.typed === "" && ev.expected) {
-        // dropped letter — blame the expected key, including focus keys
-        a.missed += 1;
-        const k = ev.expected.toLowerCase();
-        if (focus.has(k)) a.focusSlips.set(k, (a.focusSlips.get(k) ?? 0) + 1);
-      }
-    } else if (ev.expected === null) {
-      a.extra += 1;
-    }
-
-    // confusion pair (same eligibility rules as profiles.ingestEvents)
-    if (
-      ev.expected &&
-      ev.typed.length === 1 &&
-      ev.expected.toLowerCase() !== ev.typed.toLowerCase() &&
-      TRACK_RE.test(ev.expected) &&
-      TRACK_RE.test(ev.typed)
-    ) {
-      const key = `${ev.expected.toLowerCase()}>${ev.typed.toLowerCase()}`;
-      a.confusions.set(key, (a.confusions.get(key) ?? 0) + 1);
-      const k = ev.expected.toLowerCase();
-      if (focus.has(k)) a.focusSlips.set(k, (a.focusSlips.get(k) ?? 0) + 1);
-    }
-
-    prevT = ev.t;
-    prevCorrect = ev.correct;
-  }
-  return a;
-}
-
-// ---------------------------------------------------------------------------
-// Speed-curve forensics (from per-second cumulative samples)
-// ---------------------------------------------------------------------------
-
-interface CurveAnalysis {
-  firstMean: number; // mean instantaneous wpm, first 35% of active seconds
-  lastMean: number; // same, last 35%
-  first3: number; // mean of the first 3 active seconds (cold-open signal)
-  overallMean: number;
-  fade: number; // (first - last) / first, >= 0 — stamina signal
-  warmup: number; // (overall - first3) / overall — cold-open signal
-  peak: number;
-  peakSecond: number;
-  low: number; // slowest active second
-  errTotal: number;
-  worstSec: number;
-  worstSecErrs: number;
-  worstWindowStart: number; // worst 3-second error window
-  worstWindowErrs: number;
-}
-
-function analyzeCurve(result: TestResult): CurveAnalysis | null {
-  const s = result.samples;
-  if (s.length < 4) return null;
-
-  // cumulative raw → per-second instantaneous wpm:
-  // chars(k) = raw(k)*k/12 (cumulative), inst(k) = raw(k)*k - raw(k-1)*(k-1)
-  const instAll: number[] = [];
-  for (let i = 0; i < s.length; i++) {
-    const cum = s[i].raw * s[i].second;
-    const prev = i > 0 ? s[i - 1].raw * s[i - 1].second : 0;
-    instAll.push(Math.max(0, cum - prev));
-  }
-  const act: number[] = [];
-  const actSec: number[] = [];
-  for (let i = 0; i < instAll.length; i++) {
-    if (instAll[i] > 0) {
-      act.push(instAll[i]);
-      actSec.push(s[i].second);
-    }
-  }
-  if (act.length < 4) return null;
-
-  const mean = (xs: number[]) => xs.reduce((x, y) => x + y, 0) / xs.length;
-  const overallMean = mean(act);
-  const edge = Math.max(2, Math.floor(act.length * 0.35));
-  const firstMean = mean(act.slice(0, edge));
-  const lastMean = mean(act.slice(act.length - edge));
-  const first3 = act.length >= 3 ? mean(act.slice(0, 3)) : firstMean;
-  const fade = firstMean > 20 ? Math.max(0, (firstMean - lastMean) / firstMean) : 0;
-  const warmup = overallMean > 20 ? Math.max(0, (overallMean - first3) / overallMean) : 0;
-
-  let peak = 0;
-  let peakSecond = 0;
-  let low = Infinity;
-  for (let i = 0; i < act.length; i++) {
-    if (act[i] > peak) {
-      peak = act[i];
-      peakSecond = actSec[i];
-    }
-    if (act[i] < low) low = act[i];
-  }
-
-  let errTotal = 0;
-  let worstSec = 0;
-  let worstSecErrs = 0;
-  for (const x of s) {
-    errTotal += x.errors;
-    if (x.errors > worstSecErrs) {
-      worstSecErrs = x.errors;
-      worstSec = x.second;
-    }
-  }
-  let worstWindowStart = 0;
-  let worstWindowErrs = 0;
-  for (let i = 0; i < s.length; i++) {
-    let sum = 0;
-    for (let j = i; j < Math.min(s.length, i + 3); j++) sum += s[j].errors;
-    if (sum > worstWindowErrs) {
-      worstWindowErrs = sum;
-      worstWindowStart = s[i].second;
-    }
-  }
-
-  return {
-    firstMean,
-    lastMean,
-    first3,
-    overallMean,
-    fade,
-    warmup,
-    peak,
-    peakSecond,
-    low,
-    errTotal,
-    worstSec,
-    worstSecErrs,
-    worstWindowStart,
-    worstWindowErrs,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Detector bank

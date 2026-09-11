@@ -7,18 +7,20 @@ interface ResultChartProps {
   samples: SecondSample[];
   width?: number;
   height?: number;
+  /** previous personal best for this mode — draws a dashed reference line */
+  pbWpm?: number | null;
 }
 
 /** SVG chart of wpm / raw over time with error markers — MonkeyType style. */
-export function ResultChart({ samples, width = 640, height = 200 }: ResultChartProps) {
+export function ResultChart({ samples, width = 640, height = 200, pbWpm }: ResultChartProps) {
   const padL = 44;
-  const padR = 14;
+  const padR = 34;
   const padT = 14;
   const padB = 26;
 
-  const { wpmPath, rawPath, errPoints, yTicks, xTicks, maxY } = useMemo(() => {
+  const { wpmPath, rawPath, errPoints, yTicks, xTicks, maxY, pbY } = useMemo(() => {
     if (samples.length === 0) {
-      return { wpmPath: "", rawPath: "", errPoints: [], yTicks: [], xTicks: [], maxY: 50 };
+      return { wpmPath: "", rawPath: "", errPoints: [], yTicks: [], xTicks: [], maxY: 50, pbY: null };
     }
     const innerW = width - padL - padR;
     const innerH = height - padT - padB;
@@ -48,8 +50,11 @@ export function ResultChart({ samples, width = 640, height = 200 }: ResultChartP
     const xTicks: { v: number; x: number }[] = [];
     for (let s = step; s <= maxX; s += step) xTicks.push({ v: s, x: x(s) });
 
-    return { wpmPath, rawPath, errPoints, yTicks, xTicks, maxY };
-  }, [samples, width, height]);
+    const pbY =
+      pbWpm != null && pbWpm > 0 && pbWpm <= maxY && pbWpm >= 10 ? y(pbWpm) : null;
+
+    return { wpmPath, rawPath, errPoints, yTicks, xTicks, maxY, pbY };
+  }, [samples, width, height, pbWpm]);
 
   if (samples.length === 0) {
     return (
@@ -85,6 +90,30 @@ export function ResultChart({ samples, width = 640, height = 200 }: ResultChartP
       <path d={rawPath} fill="none" stroke="#5c6270" strokeWidth="1.5" strokeDasharray="1 0" opacity="0.65" />
       {/* wpm line */}
       <path d={wpmPath} fill="none" stroke="var(--hue)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+
+      {/* personal-best reference line */}
+      {pbY !== null && (
+        <g>
+          <line
+            x1={padL}
+            x2={width - padR + 20}
+            y1={pbY}
+            y2={pbY}
+            stroke="var(--hue-dim)"
+            strokeWidth="1"
+            strokeDasharray="4 4"
+          />
+          <text
+            x={width - padR + 24}
+            y={pbY + 4}
+            fontSize="10"
+            fill="#9aa0ae"
+            fontFamily="var(--font-geist-mono), monospace"
+          >
+            pb
+          </text>
+        </g>
+      )}
 
       {/* error markers */}
       {errPoints.map((p, i) => (

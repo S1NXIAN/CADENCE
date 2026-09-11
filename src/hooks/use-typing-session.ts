@@ -28,8 +28,13 @@ function diffWord(target: string, typed: string): WordDiff {
 interface UseTypingSessionOpts {
   generate: () => GeneratedTest;
   settings: Settings;
-  /** called with the final result + the full keystroke event log */
-  onFinish: (result: TestResult, events: CharEvent[]) => void;
+  /**
+   * called with the final result, the full keystroke event log, the target
+   * word list, and the final committed attempt per word — the raw material
+   * for the results-screen audit (word diffs can't be reconstructed from the
+   * event log alone because backspaces are invisible in it).
+   */
+  onFinish: (result: TestResult, events: CharEvent[], targets: string[], typed: string[]) => void;
   /** called on each accepted keystroke (for sound feedback) */
   onKeystroke?: (correct: boolean) => void;
 }
@@ -192,7 +197,7 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
     setResult(res);
     setStatus("done");
     statusRef.current = "done";
-    optsRef.current.onFinish(res, events.map((e) => ({ ...e })));
+    optsRef.current.onFinish(res, events.map((e) => ({ ...e })), test.words, finalTyped);
   }, [test]);
 
   // ---- ticking -----------------------------------------------------------

@@ -12,6 +12,7 @@ import {
   emptyLearning, finalizeLearning, ingestEvents,
 } from "@/lib/typing/profiles";
 import { generateInsights, nextTestPreview } from "@/lib/typing/insights";
+import { buildTestAudit, type TestAudit } from "@/lib/typing/audit";
 import { onPacksChanged } from "@/lib/typing/pool";
 import {
   setPacksEnabled, handleOnline, handleOffline, packRefreshDue, refreshPacks,
@@ -39,6 +40,7 @@ export default function Page() {
   const [stats, setStats] = useState<StatsData>(() => emptyStats());
   const [resultForDisplay, setResultForDisplay] = useState<TestResult | null>(null);
   const [insights, setInsights] = useState<CoachInsight[]>([]);
+  const [audit, setAudit] = useState<TestAudit | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -163,7 +165,7 @@ export default function Page() {
 
   // ---- test completion ----------------------------------------------------
   const handleFinish = useCallback(
-    (result: TestResult, events: CharEvent[]) => {
+    (result: TestResult, events: CharEvent[], targets: string[], typed: string[]) => {
       setOnboarded();
 
       // update learning model (keystroke-level) + FSRS memory reviews
@@ -176,6 +178,12 @@ export default function Page() {
       const prevBest = stats.personalBests[result.modeLabel] ?? null;
       const isPB = !prevBest || result.wpm > prevBest.wpm;
       const stamped: TestResult = { ...result, isPersonalBest: isPB };
+
+      // structured audit for the results screen — computed BEFORE recordResult
+      // so the comparison strip measures against the pre-test record, and fed
+      // the same prevBest the coach uses for its PB delta math
+      setAudit(buildTestAudit(stamped, events, targets, typed, stats, updatedLearning, prevBest));
+
       const updatedStats = recordResult(stats, stamped);
       setStats(updatedStats);
 
@@ -206,6 +214,7 @@ export default function Page() {
     session.restart();
     setResultForDisplay(null);
     setInsights([]);
+    setAudit(null);
     setFocusSignal((s) => s + 1);
   }, [session.restart]);
 
@@ -329,6 +338,7 @@ export default function Page() {
     setStatsOpen(false);
     setResultForDisplay(null);
     setInsights([]);
+    setAudit(null);
     restartAll();
   }, [restartAll]);
 
@@ -462,7 +472,11 @@ export default function Page() {
       <main className="flex flex-1 flex-col items-center justify-center px-4 py-6 sm:px-8 xl:py-8">
         <div className="w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
           {done ? (
-            <Results result={resultForDisplay} insights={settings.showCoach ? insights : []} />
+            <Results
+              result={resultForDisplay}
+              insights={settings.showCoach ? insights : []}
+              audit={audit}
+            />
           ) : (
             <>
               <WordDisplay

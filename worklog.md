@@ -248,3 +248,31 @@ Work Log:
 Stage Summary:
 - The coach now diagnoses each test from raw evidence instead of aggregates: it names the exact key that slipped against the test's own targets, prices the wpm lost to errors, timestamps error clusters ("4 err @ 19s"), separates stamina fade from cold opens and burst-stall rhythm, distinguishes dropped-letter vs overshoot signatures, merges this-test + lifetime confusion habits, flags this-run slow keys vs personal baseline, and celebrates measurable progress (PB deltas, near-misses, keys leaving the watch list, FSRS refresher queue). Idle preview now shows due-queue state. Notes cap at 4 with kind caps so the panel stays scannable.
 - Files: src/lib/typing/types.ts (CoachInsightKind + title/metric), src/lib/typing/insights.ts (full rewrite), src/app/page.tsx (events wiring), src/components/typing/results.tsx (note UI), src/lib/typing/profiles.ts (export personalMedianLatency). New: scripts/smoke-coach.sh; rewritten: scripts/check-insights.ts.
+
+---
+Task ID: 13
+Agent: Super Z (main agent)
+Task: "audit result screen to be much more informational." (results screen overhaul — surface the forensic signal as structured UI, not just prose)
+
+Work Log:
+- Read the full results pipeline (results.tsx, insights.ts forensics, use-typing-session finish flow, result-chart.tsx, page.tsx wiring, profiles.ts baselines) before designing. Gap: insights.ts computed rich per-test forensics (confusions, latencies, hesitations, curve shape) but only surfaced them as 4 prose notes; the screen itself showed hero numbers + chart + 6 chips.
+- NEW src/lib/typing/audit.ts — single source of truth for per-test forensics, shared by coach prose AND results panels (numbers on screen and sentences under them can never disagree):
+  * moved analyzeEvents() + analyzeCurve() out of insights.ts (now exported; EventAnalysis extended with perKey map = expected-key exposure/attempts this test; CurveAnalysis gained sustained = median active-second wpm).
+  * NEW buildTestAudit(result, events, targets, typed, stats, learning, prevBest?) -> TestAudit {speed, errors, rhythm, keys, words, compare} — plain JSON-able shapes only.
+  * words: per-word diffWord over (targets, finalTyped) — attempted/clean counts + hardest words (total faults, missed/extra breakout). Word diffs come from the committed word list, NOT the event log (backspaces are invisible in events).
+  * compare: test #N (lifetime), prev best wpm/acc + pbDelta, last-10 same-mode averages + wpm/acc deltas (pre-record stats = fair comparison).
+- insights.ts: deleted the duplicated forensics block (218->679 lines), imports analyzeEvents/analyzeCurve/HESITATION_MS from audit.ts; dead import topConfusions removed. Zero detector behavior change.
+- use-typing-session.ts: onFinish now also passes (targets: test.words, typed: finalTyped) — the raw material for word-level diffs.
+- page.tsx: handleFinish computes audit BEFORE recordResult with pre-record stats + the same prevBest the coach uses; new audit state reset on restart/wipe; <Results audit={...}/>.
+- results.tsx full overhaul:
+  * hero detail chips now: test / raw / error tax (warn when >= 6 wpm) / time / keystrokes / error rate per 100 keys.
+  * CompareStrip: test #N, prev best + delta, last-10 avg + delta, acc avg + delta (shown when |delta| >= 0.5); deltas green/warn.
+  * "TEST AUDIT — everything the coach saw in this run" grid: SpeedPanel (peak @s / sustained / closing / opening-3s with proportional bars + fade & cold-open verdicts), ErrorPanel (char-fate stacked bar ok/wrong/extra/missed + legend, bad keystrokes + rate, worst stretch, "meant -> typed" confusion chips), KeysPanel (drill targets report card: attempts/slips/median-ms with clean/slip status; slowest keys vs personal baseline with +%; quickest keys), RhythmPanel (consistency % + bar, pauses >= 0.9s with longest freeze + before which key, burst spread peak/low).
+  * WordCheck strip: clean x/y words + hardest words as wavy-underlined chips with fault counts and "N dropped" suffix.
+  * Coach notes section unchanged (kind icons, metric chips).
+- result-chart.tsx: optional pbWpm prop draws a dashed "pb" reference line (only when visible on scale); padR widened for the label.
+- Verification: NEW scripts/audit-check.ts (18 assertions over a synthetic event log/samples/word pairs: bad-stroke counting, confusion capture, worst 3s window, focus-key report card, slowest-key filtering >= 3 samples, word faults incl. missed/extra, fade detection, compare math, insights still generate through the shared path) — ALL PASS after fixing test-side arithmetic (worst window [13,15] correctly sums 4); tsc filtered-clean; eslint clean on all 6 touched files; check-generator 68/68; smoke-dict.sh pass; NEW scripts/smoke-audit.sh browser E2E (words-10 with 2 injected wrong leading chars) — all 7 audit sections render, compare chips + confusion chips + clean-ratio present, desktop 1440px (scripts/audit-results-full.png) and mobile 390px (audit-results-mobile.png) verified visually; real slowest-key detection fired on live data ('u' 330ms +52%).
+
+Stage Summary:
+- The results screen is now a full post-test audit: speed anatomy (peak/sustained/closing/open + fade & cold-open verdicts), error autopsy (char-fate bar, bad-stroke rate, worst stretch, meant->typed confusion chips), key report (drill-target report card, slowest/quickest keys vs personal baseline), rhythm (consistency, freezes, burst spread), word check (clean ratio + flagged words), record comparison strip (test #N, prev best, last-10 deltas), and a dashed PB line on the WPM chart. Coach prose and screen numbers share one forensic engine (audit.ts), so they can never contradict each other. All data stays local-first; nothing new is persisted (audit is computed at finish from data already recorded).
+- Files: src/lib/typing/audit.ts (NEW), src/lib/typing/insights.ts (slimmed, imports shared forensics), src/hooks/use-typing-session.ts (onFinish + targets/typed), src/app/page.tsx (audit wiring), src/components/typing/results.tsx (full overhaul), src/components/typing/result-chart.tsx (pb line). New tools: scripts/audit-check.ts, scripts/smoke-audit.sh.
