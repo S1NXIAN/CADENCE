@@ -1,5 +1,5 @@
 import type { CoachInsight, LearningData, Settings, StatsData, TestResult } from "./types";
-import { computeWeakKeys, topConfusions, weakBigrams } from "./profiles";
+import { computeWeakKeys, topConfusions, topErrorContexts, weakBigrams } from "./profiles";
 
 /**
  * Generate human coaching insights after a completed test.
@@ -64,6 +64,18 @@ export function generateInsights(
     insights.push({
       kind: "tip",
       message: `You've mistyped '${c.expected}' as '${c.typed}' ${c.count}× recently. That's a finger-path habit — slow, deliberate reps on that pair will rewire it.`,
+    });
+  }
+
+  // 4b. error context — which key COMBINATION preceded the mistake.
+  // An error right after specific keys is a transition problem, not a key problem.
+  const errCtx = topErrorContexts(learning, 1)[0];
+  if (errCtx) {
+    const before = errCtx.trigram.slice(0, 2);
+    const target = errCtx.trigram.slice(2);
+    insights.push({
+      kind: "tip",
+      message: `Your errors cluster on the transition '${before}'→'${target}' (${errCtx.count}× recently). The combo is what trips you, not the lone key — adaptive mode will drill that exact sequence.`,
     });
   }
 

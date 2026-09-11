@@ -67,10 +67,20 @@ export interface ConfusionPair {
   lastSeen: number;
 }
 
+// trigram error context: the 2 keys typed immediately BEFORE a mistake + the
+// expected key that was fumbled. Captures "key combination" failures that
+// per-key stats can't see (e.g. errors on 'e' specifically after 'th').
+export interface ErrorContext {
+  trigram: string; // prev2 + prev1 + expected, lowercase
+  count: number;
+  lastSeen: number;
+}
+
 export interface LearningData {
   keyProfiles: Record<string, KeyProfile>;
   bigramProfiles: Record<string, BigramProfile>;
   confusions: ConfusionPair[];
+  errorContexts: ErrorContext[];
   totalKeystrokes: number;
   totalChars: number;
   totalTests: number;

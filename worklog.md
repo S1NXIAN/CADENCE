@@ -41,3 +41,25 @@ Work Log:
 Stage Summary:
 - The typing stage now scales with the viewport: ~2.2× more screen area used at 1366px (768→1024px wide, 27→36px words), 4-line stream on tall desktops; mobile untouched.
 - Verified files: src/app/globals.css, src/components/typing/word-display.tsx, src/components/typing/results.tsx, src/app/page.tsx.
+
+---
+Task ID: 3
+Agent: Super Z (main agent)
+Task: User asked (1) does the engine measure time-to-find a key, (2) does it measure the 2-3 key combination before an error; requested research of major typing trainers' strategies and to implement only non-redundant features.
+
+Work Log:
+- Engine audit: per-key motor latency ALREADY implemented (EWMA inter-key interval, 2s cap, feeds weakness latencyPenalty + heatmap "slower keys" + overview chips) → feature 1 already covered, no change. Found REAL BUG: bigramProfiles[].errRate never updated (bigram error model was dead code; weakBigrams always returned weakness 0).
+- Research (web search x5): keybr = per-key confidence + progressive unlock + weakest-key-targeted pseudo-words (Cadence already matches per-key + real-word curation); Monkeytype = no adaptation, "practice missed words" only; Typing.com = tracks troublesome keys + TypeAI stories around them; TypingClub = home-row progressive curriculum; Ratatype/TypingTest.com = problem-key drills; motor research (IKI studies 2022-2025) validates inter-key intervals as skill measure and error-context (preceding chars) as diagnostic signal. None of the popular trainers implement error-context transitions → non-redundant differentiator.
+- Implemented error-context tracking (feature 2):
+  - types.ts: ErrorContext (trigram = prev2+prev1+expected) + errorContexts in LearningData; lastVersion 2.
+  - profiles.ts: bigram ingestion restructured — transitions (prev->typed on correct, prev->expected on errors) now update attempts, latency (correct only) AND errRate EWMA (always); trigram error contexts recorded with count, capped 40 sorted by count; weakBigrams adds latency penalty vs median (slow combos now weak too); new topErrorContexts().
+  - insights.ts: new coach insight "errors cluster on the transition 'th'→'e' (N× recently)..." when a context reaches count>=2.
+  - stats-panel.tsx: "trickiest letter pairs" → "trickiest key transitions (errors & slow combos)" with err% + latency ms per chip.
+  - storage.ts: no migration needed (loadLearning/importData merge emptyLearning defaults).
+  - Generator consumes weakBigrams already → adaptive curation now automatically boosts words containing error-prone/slow transitions (confidence-gated by MIN_ATTEMPTS=4).
+- Verified: bun unit check (insights fire 'th'→'e' message, idle preview lists real weak pairs); e2e script scripts/e2e-error-context.sh — 3 deliberate mid-word errors → localStorage shows errRate on exactly wa/ro/ma transitions + trigram contexts ewa/pro/yma; keys tab heatmap latency colors + transitions chips render; tsc + eslint clean.
+
+Stage Summary:
+- Feature 1 (key-finding latency): was already fully implemented and surfaced — confirmed correct, untouched.
+- Feature 2 (error context): now measured at both bigram (transition error rate + latency → weakness → curation) and trigram (2-keys-before-mistake contexts → coach notes) levels; fixed dead bigram errRate bug.
+- Rejected as redundant: everything else (progressive letter unlock = keybr-style curriculum is redundant with Cadence's real-word adaptive curation; missed-word practice mode redundant with auto-curated adaptive mode; pseudo-words rejected to keep real-word flow).

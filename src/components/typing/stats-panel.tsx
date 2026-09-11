@@ -112,12 +112,15 @@ export function StatsPanel({
             <KeyHeatmap learning={learning} />
             {bgs.length > 0 && (
               <div>
-                <SectionTitle>trickiest letter pairs</SectionTitle>
+                <SectionTitle>trickiest key transitions (errors & slow combos)</SectionTitle>
                 <div className="flex flex-wrap gap-2">
                   {bgs.map((b) => (
                     <span key={b.bigram} className="bg-elevated inline-flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-sm" style={{ borderColor: "#23252b" }}>
                       {b.bigram}
-                      <span className="text-dim text-xs">{(b.errRate * 100).toFixed(1)}% err</span>
+                      <span className="text-dim text-xs">
+                        {(b.errRate * 100).toFixed(1)}% err
+                        {b.latency !== null ? ` · ${Math.round(b.latency)}ms` : ""}
+                      </span>
                     </span>
                   ))}
                 </div>
