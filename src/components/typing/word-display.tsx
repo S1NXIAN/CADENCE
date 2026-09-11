@@ -1,0 +1,248 @@
+"use client";
+
+import { useLayoutEffect, useRef, useState, useEffect } from "react";
+import type { Settings } from "@/lib/typing/types";
+
+interface WordDisplayProps {
+  words: string[];
+  typedFor: (i: number) => string;
+  wordIndex: number;
+  input: string;
+  status: "idle" | "running" | "done";
+  settings: Settings;
+  timeLeft: number | null;
+  liveWpm: number;
+  liveAcc: number;
+  focusSignal: number;
+  onKeyDown: (e: React.KeyboardEvent) => void;
+}
+
+interface CaretPos {
+  left: number;
+  top: number;
+  height: number;
+  width: number;
+}
+
+export function WordDisplay({
+  words,
+  typedFor,
+  wordIndex,
+  input,
+  status,
+  settings,
+  timeLeft,
+  liveWpm,
+  liveAcc,
+  focusSignal,
+  onKeyDown,
+}: WordDisplayProps) {
+  const outerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [caret, setCaret] = useState<CaretPos>({ left: 0, top: 0, height: 30, width: 3 });
+  const [lineH, setLineH] = useState(57.6);
+  const [focused, setFocused] = useState(true);
+
+  // render a window of words around the current position for performance
+  const from = Math.max(0, wordIndex - 12);
+  const to = Math.min(words.length, Math.max(wordIndex + 30, 30));
+  const visible = words.slice(from, to);
+
+  // measure caret position after every render that affects it
+  useLayoutEffect(() => {
+    const outer = outerRef.current;
+    const inner = innerRef.current;
+    if (!outer || !inner) return;
+
+    const target = inner.querySelector<HTMLElement>(`[data-wi="${wordIndex}"]`);
+    if (!target) return;
+    const chars = target.querySelectorAll<HTMLElement>("[data-ci]");
+    const el = chars[Math.min(input.length, Math.max(chars.length - 1, 0))];
+    if (!el) return;
+
+    const outerRect = outer.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const isPastEnd = input.length >= chars.length;
+
+    const left = isPastEnd
+      ? elRect.right - outerRect.left + 1
+      : elRect.left - outerRect.left - 1;
+    const top = elRect.top - outerRect.top;
+    const height = elRect.height;
+
+    setCaret((prev) =>
+      Math.abs(prev.left - left) < 0.5 && Math.abs(prev.top - top) < 0.5
+        ? prev
+        : { left, top, height, width: Math.max(elRect.width * 0.55, 4) }
+    );
+
+    // measure line height from the first stacked pair of words
+    const wordEls = inner.querySelectorAll<HTMLElement>("[data-wi]");
+    if (wordEls.length >= 2) {
+      const t0 = wordEls[0].getBoundingClientRect().top;
+      for (let i = 1; i < wordEls.length; i++) {
+        const t = wordEls[i].getBoundingClientRect().top;
+        if (t - t0 > 10) {
+          setLineH(t - t0);
+          break;
+        }
+      }
+    }
+  }, [wordIndex, input, words, status]);
+
+  // active line → vertical scroll of the word stream
+  const activeLine = Math.round(caret.top / lineH);
+  const scrollY = Math.max(0, activeLine - 1) * lineH;
+
+  const focusInput = () => inputRef.current?.focus();
+
+  useEffect(() => {
+    focusInput();
+  }, []);
+
+  // refocus when an overlay closes (parent bumps focusSignal)
+  useEffect(() => {
+    if (focusSignal > 0) inputRef.current?.focus();
+  }, [focusSignal]);
+
+  const caretStyle =
+    settings.caretStyle === "block"
+      ? { width: caret.width, height: caret.height, top: caret.top }
+      : settings.caretStyle === "underline"
+        ? { width: caret.width, height: 3, top: caret.top + caret.height - 3 }
+        : { width: 2.5, height: caret.height, top: caret.top };
+
+  return (
+    <div
+      className="relative select-none"
+      onMouseDown={(e) => {
+        e.preventDefault();
+        focusInput();
+      }}
+    >
+      {/* hidden input captures typing */}
+      <input
+        ref={inputRef}
+        type="text"
+        autoCapitalize="off"
+        autoCorrect="off"
+        autoComplete="off"
+        spellCheck={false}
+        tabIndex={-1}
+        aria-label="typing input"
+        className="absolute left-0 top-0 h-1 w-1 opacity-0"
+        style={{ caretColor: "transparent" }}
+        onKeyDown={onKeyDown}
+        onBlur={() => setFocused(false)}
+        onFocus={() => setFocused(true)}
+      />
+
+      {/* live metrics row */}
+      <div className="mb-4 flex h-8 items-end justify-between px-1 font-mono">
+        <div className="flex items-baseline gap-7">
+          {timeLeft !== null ? (
+            <div className="text-hue text-3xl font-semibold tabular-nums" aria-label="seconds left">
+              {timeLeft}
+            </div>
+          ) : (
+            <div className="text-dim tabular-nums text-sm">
+              {Math.min(wordIndex + 1, words.length)} / {words.length} words
+            </div>
+          )}
+          {settings.liveWpm && status === "running" && (
+            <>
+              <div className="text-sub tabular-nums text-lg" aria-live="off">
+                {liveWpm} <span className="text-dim text-xs">wpm</span>
+              </div>
+              <div className="text-sub tabular-nums text-lg" aria-live="off">
+                {liveAcc}% <span className="text-dim text-xs">acc</span>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="text-dim pb-1 text-xs tracking-wide uppercase">
+          {settings.mode === "adaptive" ? "curated test" : settings.mode}
+        </div>
+      </div>
+
+      {/* word stream */}
+      <div
+        ref={outerRef}
+        className={`word-line relative overflow-hidden transition-opacity duration-200 ${
+          focused ? "opacity-100" : "opacity-35"
+        }`}
+        style={{ height: "calc(var(--word-line-h) * 3)" }}
+        aria-label="typing test words"
+        role="textbox"
+        aria-readonly
+      >
+        <div
+          ref={innerRef}
+          className="relative px-1 font-mono text-[1.55rem] leading-[3.6rem] transition-transform duration-150 ease-out sm:text-[1.7rem]"
+          style={{ transform: `translateY(-${scrollY}px)` }}
+        >
+          {/* caret */}
+          {status !== "done" && focused && (
+            <div
+              className={`bg-hue pointer-events-none absolute z-10 ${
+                status === "idle" ? "caret-blink" : ""
+              }`}
+              style={{
+                left: `${caret.left}px`,
+                top: `${caretStyle.top}px`,
+                width: `${caretStyle.width}px`,
+                height: `${caretStyle.height}px`,
+                transition: "left 90ms linear, top 120ms ease-out",
+                borderRadius: settings.caretStyle === "block" ? 2 : 1,
+              }}
+            />
+          )}
+          {visible.map((word, vi) => {
+            const wi = from + vi;
+            const typed = typedFor(wi);
+            const isCurrent = wi === wordIndex;
+            const chars = [];
+            const maxLen = Math.max(word.length, typed.length);
+            for (let ci = 0; ci < maxLen; ci++) {
+              const targetChar = ci < word.length ? word[ci] : null;
+              const typedChar = ci < typed.length ? typed[ci] : null;
+              let cls = "text-dim";
+              if (typedChar !== null) {
+                if (targetChar === null) cls = "text-err/60";
+                else if (typedChar === targetChar) cls = "text-foreground";
+                else cls = "text-err";
+              } else if (targetChar !== null && wi < wordIndex) {
+                // missed char in a submitted word
+                cls = "text-err/50";
+              }
+              chars.push(
+                <span key={ci} data-ci={ci} className={cls}>
+                  {targetChar ?? typedChar}
+                </span>
+              );
+            }
+            return (
+              <span
+                key={wi}
+                data-wi={wi}
+                className={`mr-[0.6ch] inline-block border-b-2 pb-[2px] ${
+                  isCurrent ? "border-hue/50" : "border-transparent"
+                }`}
+              >
+                {chars}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* focus hint */}
+      {!focused && (
+        <div className="text-dim absolute inset-x-0 top-1/2 text-center font-mono text-sm">
+          click here or press any key to focus
+        </div>
+      )}
+    </div>
+  );
+}
