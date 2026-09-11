@@ -1,29 +1,29 @@
-WORDS: get|song|proud|presence|star|both|science|those|before|interesting|wonderful|sugar|foot|smooth|issue|sensitive|sturdy|college|office|law|pasta|somebody|program|calm|city
+WORDS: ask|residence|turn|support|curious|butter|others|service|whiskey|yesterday|industry|humble|sleek|question|energy|wife|sculpture|favorite|second|unusual|effect|history|hear|news|panda
 TOTAL=25
-word 1 ('get') ty=0 caret=OK backward=0
-word 2 ('song') ty=0 caret=OK backward=0
-word 3 ('proud') ty=0 caret=OK backward=0
-word 4 ('presence') ty=0 caret=OK backward=0
-word 5 ('star') ty=0 caret=OK backward=0
-word 6 ('both') ty=0 caret=OK backward=0
-word 7 ('science') ty=0 caret=OK backward=0
-word 8 ('those') ty=0 caret=OK backward=0
-word 9 ('before') ty=0 caret=OK backward=0
-word 10 ('interesting') ty=0 caret=OK backward=0
-word 11 ('wonderful') ty=0 caret=OK backward=0
-word 12 ('sugar') ty=0 caret=OK backward=0
-word 13 ('foot') ty=0 caret=OK backward=0
-word 14 ('smooth') ty=-80 caret=OK backward=0
-word 15 ('issue') ty=-80 caret=OK backward=0
-word 16 ('sensitive') ty=-80 caret=OK backward=0
-word 17 ('sturdy') ty=-80 caret=OK backward=0
-word 18 ('college') ty=-80 caret=OK backward=0
-word 19 ('office') ty=-80 caret=OK backward=0
-word 20 ('law') ty=-80 caret=OK backward=0
-word 21 ('pasta') ty=-80 caret=OK backward=0
-word 22 ('somebody') ty=-80 caret=OK backward=0
-word 23 ('program') ty=-80 caret=OK backward=0
-word 24 ('calm') ty=-80 caret=OK backward=0
-word 25 ('city') -> results screen
+word 1 ('ask') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 2 ('residence') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 3 ('turn') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 4 ('support') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 5 ('curious') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 6 ('butter') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 7 ('others') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 8 ('service') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 9 ('whiskey') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 10 ('yesterday') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 11 ('industry') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 12 ('humble') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 13 ('sleek') ty=-80 from=0 rewrap=0 caret=OK backward=0
+word 14 ('question') ty=-80 from=0 rewrap=0 caret=OK backward=0
+word 15 ('energy') ty=-80 from=0 rewrap=0 caret=OK backward=0
+word 16 ('wife') ty=-80 from=0 rewrap=0 caret=OK backward=0
+word 17 ('sculpture') ty=-80 from=0 rewrap=0 caret=OK backward=0
+word 18 ('favorite') ty=-80 from=0 rewrap=0 caret=OK backward=0
+word 19 ('second') ty=-80 from=7 rewrap=0 caret=OK backward=0
+word 20 ('unusual') ty=-80 from=7 rewrap=0 caret=OK backward=0
+word 21 ('effect') ty=-80 from=7 rewrap=0 caret=OK backward=0
+word 22 ('history') ty=-80 from=7 rewrap=0 caret=OK backward=0
+word 23 ('hear') ty=-80 from=7 rewrap=0 caret=OK backward=0
+word 24 ('news') ty=-80 from=7 rewrap=0 caret=OK backward=0
+word 25 ('panda') -> results screen
 
-RESULT: backward_scroll_events=0 caret_mispositioned=0
+RESULT: backward_scroll_events=0 rewrap_events=0 caret_mispositioned=0

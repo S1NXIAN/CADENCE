@@ -43,10 +43,30 @@ export function WordDisplay({
   const [caret, setCaret] = useState<CaretPos>({ left: 0, top: 0, height: 30, width: 3 });
   const [lineH, setLineH] = useState(57.6);
   const [focused, setFocused] = useState(true);
+  // first rendered word. Only ever advances by WHOLE LINES (see measure
+  // effect) — advancing word-by-word re-wraps the entire stream every
+  // keystroke, which makes the top line visibly reshuffle mid-test.
+  const [winStart, setWinStart] = useState(0);
+  const [prevWords, setPrevWords] = useState(words);
+
+  // adjust-during-render (react.dev "storing information from previous
+  // renders"): a fresh word list (new test / restart) rewinds the window.
+  if (prevWords !== words) {
+    setPrevWords(words);
+    setWinStart(0);
+  }
+  // backspace can walk the cursor above the window (ctrl+backspace pops
+  // words) — rewind so the active word stays rendered. Re-wrapping is
+  // acceptable in this rare correction path.
+  if (wordIndex < winStart) {
+    setWinStart(wordIndex);
+  }
 
   // render a window of words around the current position for performance
-  // (wide screens fit more words per line, so keep a generous window)
-  const from = Math.max(0, wordIndex - 15);
+  // (wide screens fit more words per line, so keep a generous window).
+  // min() guards transient frames where wordIndex rewinds before the
+  // window reset lands, so the active word is always rendered.
+  const from = Math.min(winStart, wordIndex);
   const to = Math.min(words.length, Math.max(wordIndex + 45, 45));
   const visible = words.slice(from, to);
 
@@ -77,6 +97,35 @@ export function WordDisplay({
       : elRect.left - innerRect.left - 1;
     const top = elRect.top - innerRect.top;
     const height = elRect.height;
+
+    // Lazy whole-line window advance: once the active word reaches the 4th
+    // rendered line, retire the first rendered line entirely. Retiring whole
+    // lines never changes how later words wrap (they all shift up one line
+    // intact), and compensating caret.top by one line keeps scrollY, caret
+    // and pixels identical across the swap — the retire is invisible.
+    // (Requires lineH to be measured, which always happens on line 0.)
+    const measuredLine = lineH > 0 ? Math.round(top / lineH) : 0;
+    if (measuredLine >= 3) {
+      const streamWords = inner.querySelectorAll<HTMLElement>("[data-wi]");
+      const top0 = streamWords[0]?.getBoundingClientRect().top ?? 0;
+      let firstLineCount = 0;
+      for (const w of streamWords) {
+        if (w.getBoundingClientRect().top - top0 < 10) firstLineCount++;
+        else break;
+      }
+      if (firstLineCount > 0 && from + firstLineCount <= wordIndex) {
+        setWinStart((prev) =>
+          Math.max(prev, from + firstLineCount)
+        );
+        setCaret({
+          left,
+          top: top - lineH,
+          height,
+          width: Math.max(elRect.width * 0.55, 4),
+        });
+        return;
+      }
+    }
 
     setCaret((prev) =>
       Math.abs(prev.left - left) < 0.5 && Math.abs(prev.top - top) < 0.5

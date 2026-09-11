@@ -61,16 +61,21 @@ sample() {
     if (tr && tr !== 'none') ty = new DOMMatrixReadOnly(tr).m42;
     const caret = inner.querySelector('.bg-hue');
     const w = document.querySelector('[data-wi=\"$1\"]');
+    const els = Array.from(inner.querySelectorAll('[data-wi]'));
+    const from = els.length ? +els[0].getAttribute('data-wi') : -1;
+    const ref = inner.querySelector('[data-wi=\"' + (from + 8) + '\"]');
+    const refTop = ref ? +ref.getBoundingClientRect().top.toFixed(1) : null;
     let cr = null, wr = null;
     if (caret) { const r = caret.getBoundingClientRect(); cr = {l:+r.left.toFixed(1), r:+r.right.toFixed(1), t:+r.top.toFixed(1), b:+r.bottom.toFixed(1)}; }
     if (w) { const r = w.getBoundingClientRect(); wr = {l:+r.left.toFixed(1), r:+r.right.toFixed(1), t:+r.top.toFixed(1), b:+r.bottom.toFixed(1)}; }
-    return JSON.stringify({ty:+ty.toFixed(1), caret:cr, word:wr, done:false});
+    return JSON.stringify({ty:+ty.toFixed(1), from, refTop, caret:cr, word:wr, done:false});
   })()" > "$TMP"
   decode
 }
 
-prev_ty=0
+prev=""
 oscillation=0
+rewraps=0
 caret_bad=0
 
 for (( i=0; i<N; i++ )); do
@@ -80,7 +85,7 @@ for (( i=0; i<N; i++ )); do
     sleep 0.055
   done
   agent-browser press "Space" >/dev/null
-  sleep 0.12
+  sleep 0.35  # let the 150ms scroll transition settle so samples are exact
   # if a dropped key stalled progress, retry the space once
   agent-browser eval "(()=>{const els=document.querySelectorAll('[data-wi]'); let n=0; for (const e of els){ if(e.className.includes('border-hue')) n++; } const d=document.querySelector('.text-dim.tabular-nums'); return d?d.textContent:'?';})()" > /tmp/c.raw 2>/dev/null
   CNT=$(python3 -c "
@@ -92,17 +97,26 @@ print(v.split(' / ')[0])
 " 2>/dev/null || echo "?")
   if [ "$CNT" != "$((i+1))" ] && [ "$i" -lt $((N-1)) ]; then
     agent-browser press "Space" >/dev/null
-    sleep 0.12
+    sleep 0.35
   fi
 
   S=$(sample "$((i+1))")
-  INFO=$(python3 - "$S" "$prev_ty" "$((i+1))" "$word" <<'EOF'
+  INFO=$(python3 - "$S" "$prev" "$((i+1))" "$word" <<'EOF'
 import json,sys
-raw=sys.argv[1]; prev=float(sys.argv[2]); n=sys.argv[3]; word=sys.argv[4]
+raw=sys.argv[1]; prev=json.loads(sys.argv[2]) if sys.argv[2] else None; n=sys.argv[3]; word=sys.argv[4]
 try: d=json.loads(raw)
 except Exception: print(f"PARSE_FAIL {raw[:80]}"); sys.exit()
 if d.get("done"): print(f"word {n} ('{word}') -> results screen"); sys.exit()
-ty=d["ty"]; back = 1 if ty > prev+1 else 0  # scroll-up = ty decreases; an INCREASE = view scrolled back down
+ty=d["ty"]; frm=d["from"]; ref=d.get("refTop")
+back = 1 if (prev and ty > prev["ty"]+1) else 0   # scroll-up = ty decreases; an INCREASE = view scrolled back down
+rewrap = 0
+if prev and prev.get("from") == frm and prev.get("refTop") is not None and ref is not None:
+    # while the window start is unchanged, every word's STREAM-space top
+    # must be constant (screen top may shift only by the scroll delta)
+    # stream = screen - translateY, and ty is negative when scrolled
+    st_now = round(ref - ty, 1)
+    st_prev = round(prev["refTop"] - prev["ty"], 1)
+    rewrap = 0 if abs(st_now - st_prev) < 1.5 else 1
 c=d.get("caret"); w=d.get("word")
 if c and w:
     okx = (c["l"] >= w["l"]-6) and (c["r"] <= w["r"]+8)
@@ -110,24 +124,35 @@ if c and w:
     cc = "OK" if (okx and oky) else f"BAD caret=({c['l']},{c['t']},{c['r']},{c['b']}) word=({w['l']},{w['t']},{w['r']},{w['b']})"
 else:
     cc = "NORECT"
-print(f"word {n} ('{word}') ty={ty} caret={cc} backward={back}")
+print(f"word {n} ('{word}') ty={ty} from={frm} rewrap={rewrap} caret={cc} backward={back}")
 EOF
 )
   echo "$INFO" | tee -a "$OUT"
   case "$INFO" in
     *"backward=1"*) oscillation=$((oscillation+1)) ;;
+    *"rewrap=1"*) rewraps=$((rewraps+1)) ;;
     *BAD*|*NORECT*|*PARSE_FAIL*) [[ "$INFO" != *"results screen"* ]] && caret_bad=$((caret_bad+1)) ;;
   esac
-  [[ "$INFO" == *"ty="* ]] && prev_ty=$(echo "$INFO" | sed -E 's/.*ty=(-?[0-9.]+).*/\1/')
+  # stash this sample's scroll/window metrics for the next iteration
+  prev=$(python3 - "$S" <<'EOF'
+import json,sys
+raw=sys.argv[1]
+try:
+    d=json.loads(raw)
+    if d.get("done"): print(json.dumps(None)); sys.exit()
+    print(json.dumps({"ty":d["ty"],"from":d["from"],"refTop":d.get("refTop")}))
+except Exception: print(json.dumps(None))
+EOF
+)
   case $((i+1)) in 5|12|16|20|25) agent-browser screenshot "/home/z/my-project/scripts/scrollcheck-w$((i+1)).png" >/dev/null ;; esac
   sleep 0.08
 done
 
 echo "" | tee -a "$OUT"
-echo "RESULT: backward_scroll_events=$oscillation caret_mispositioned=$caret_bad" | tee -a "$OUT"
-if [ "$oscillation" -eq 0 ] && [ "$caret_bad" -eq 0 ]; then
-  echo "PASS: no scroll oscillation, caret tracked correctly"
+echo "RESULT: backward_scroll_events=$oscillation rewrap_events=$rewraps caret_mispositioned=$caret_bad" | tee -a "$OUT"
+if [ "$oscillation" -eq 0 ] && [ "$rewraps" -eq 0 ] && [ "$caret_bad" -eq 0 ]; then
+  echo "PASS: no scroll oscillation, no mid-test re-wrap, caret tracked correctly"
 else
-  echo "FAIL: scroll/caret regression present"
+  echo "FAIL: scroll/wrap/caret regression present"
   exit 1
 fi

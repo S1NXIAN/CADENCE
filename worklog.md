@@ -81,3 +81,21 @@ Stage Summary:
 - Word-stream scroll oscillation + detached caret eliminated (measurement made scroll-invariant); active-word underline now hugs the text; line stride exact at 80px so the 3-line viewport no longer clips.
 - Verified files: src/components/typing/word-display.tsx only.
 - Regression script kept at scripts/e2e-scroll-fix.sh for future scroll/caret changes.
+
+---
+Task ID: 5
+Agent: Super Z (main agent)
+Task: User report — "words keep moving at the top line whenever I finish something past the middle point" (mid-test top-line reshuffle).
+
+Work Log:
+- Diagnosis: the render window start was `wordIndex - 15`, sliding ONE WORD every keystroke past word 15. Each 1-word shift re-wraps the entire stream (line breaks depend on all preceding content), so every finished word reshuffled all lines — worst at the top line, exactly past the test midpoint. The ±1-line flip of the active word's line during re-wrap also caused occasional scroll jumps.
+- Fix in src/components/typing/word-display.tsx — window now advances only by WHOLE LINES, lazily and pixel-invisibly:
+  - `winStart` state replaces the wordIndex-derived `from`; rendered slice = [winStart, wordIndex+45]. Adjust-during-render guards: fresh `words` array → winStart 0; backspace walking above the window → winStart = wordIndex (re-wrap acceptable in that rare correction path).
+  - Measure effect: when the active word's measured line >= 3, count the words on rendered line 0, retire exactly that line (setWinStart) and compensate caret.top by -lineH in the same pre-paint commit. Retiring whole lines never changes later words' wrapping, and the caret/scrollY compensation keeps scrollY continuity (S_new = S_old - lineH) → the retire is pixel-invisible; the visible scroll remains the smooth per-crossing translateY glide.
+  - react-hooks v6 (set-state-in-effect): resets moved to the documented adjust-during-render pattern; the retire's setWinStart uses functional-updater form. tsc + eslint clean.
+- Verification (scripts/e2e-scroll-fix.sh, extended with wrap assertions): full 25-word test @1366x768 — 0 backward scrolls, 0 re-wraps, 0 caret mispositions; window retired twice (0→7→12), always whole lines; single smooth scroll 0→-80. Probe at 1920x1080 (4-line, 88px stride): stream-space top of a tracked word constant (527.1) across 24 words through two retires (0→6→11); one glide 0→-88. Initially the e2e flagged rewrap=1 at the crossing word — turned out to be a sign error in the test assertion itself (stream = screen - ty, ty is negative); app was correct.
+- Screenshots scrollcheck-w12/w20: after crossing + after retires the layout is stable, active word underlined with caret attached.
+
+Stage Summary:
+- Mid-test top-line reshuffle eliminated: between line crossings the stream layout is now byte-stable; window shrinks/grows only by whole lines at pixel-invisible moments.
+- Verified file: src/components/typing/word-display.tsx only. Regression harness updated (rewrap assertions) at scripts/e2e-scroll-fix.sh; crossing probe at scripts/probe-crossing.sh.
