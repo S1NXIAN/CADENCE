@@ -59,8 +59,12 @@ export function ActivityHeatmap({ stats }: { stats: StatsData }) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const dow = (today.getDay() + 6) % 7; // Monday = 0 … Sunday = 6
-    const lastMonday = today.getTime() - dow * 86400000;
-    const firstMonday = lastMonday - (WEEKS - 1) * 7 * 86400000;
+    // Calendar arithmetic (setDate), never ms addition — +N*86400000 lands
+    // at 23:00 the previous day across DST fall-back and shifts the grid.
+    const lastMonday = new Date(today);
+    lastMonday.setDate(today.getDate() - dow);
+    const firstMonday = new Date(lastMonday);
+    firstMonday.setDate(lastMonday.getDate() - (WEEKS - 1) * 7);
 
     const cells: { x: number; y: number; fill: string; title: string; today: boolean }[] = [];
     const monthLabels: { x: number; text: string }[] = [];
@@ -68,7 +72,8 @@ export function ActivityHeatmap({ stats }: { stats: StatsData }) {
     let lastLabelCol = -99;
 
     for (let w = 0; w < WEEKS; w++) {
-      const monday = new Date(firstMonday + w * 7 * 86400000);
+      const monday = new Date(firstMonday);
+      monday.setDate(firstMonday.getDate() + w * 7);
       const month = monday.getMonth();
       // skip if the label would overflow the right edge (GitHub behavior)
       const labelW = MONTHS[month].length * 6.4;
@@ -78,7 +83,8 @@ export function ActivityHeatmap({ stats }: { stats: StatsData }) {
         lastLabelCol = w;
       }
       for (let r = 0; r < 7; r++) {
-        const date = new Date(monday.getTime() + r * 86400000);
+        const date = new Date(monday);
+        date.setDate(monday.getDate() + r);
         if (date.getTime() > today.getTime()) continue; // future — leave blank
         const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
         const d = days.get(key);

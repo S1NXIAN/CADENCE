@@ -29,6 +29,7 @@ export interface ActivitySummary {
 /** Merge ledger + history into per-day activity, limited to the last `windowDays` days. */
 export function buildActivityDays(stats: StatsData, windowDays = 400): Map<string, ActivityDay> {
   const cutoffMs = Date.now() - windowDays * 86400000;
+  const cutoffDay = isoDayLocal(new Date(cutoffMs));
   const fromHistory = new Map<string, DayActivity>();
 
   for (const h of stats.history) {
@@ -63,8 +64,10 @@ export function buildActivityDays(stats: StatsData, windowDays = 400): Map<strin
   }
   for (const [date, v] of fromHistory) put(date, v);
 
-  for (const [date, v] of merged) {
-    if (new Date(date + "T00:00:00").getTime() < cutoffMs) merged.delete(date);
+  for (const date of merged.keys()) {
+    // compare on calendar-day keys, not ms — a "23:59 vs 00:01" ms cutoff
+    // would flicker a whole day in/out around the boundary
+    if (date < cutoffDay) merged.delete(date);
   }
   return merged;
 }
@@ -85,14 +88,16 @@ export function activitySummary(days: Map<string, ActivityDay>): ActivitySummary
     }
   }
 
+  // Consecutive-day runs via CALENDAR day numbers — exact 86400000ms
+  // equality breaks across DST transitions (days are 25h/23h long there).
   let longestRun = 0;
   let run = 0;
-  let prevMs: number | null = null;
+  let prevNum: number | null = null;
   for (const date of dates) {
-    const ms = new Date(date + "T00:00:00").getTime();
-    if (prevMs !== null && ms - prevMs === 86400000) run += 1;
+    const num = dayNum(date);
+    if (prevNum !== null && num - prevNum === 1) run += 1;
     else run = 1;
-    prevMs = ms;
+    prevNum = num;
     if (run > longestRun) longestRun = run;
   }
 
@@ -101,10 +106,11 @@ export function activitySummary(days: Map<string, ActivityDay>): ActivitySummary
   let currentRun = 0;
   const start = new Date();
   start.setHours(0, 0, 0, 0);
-  if (!days.has(isoDayLocal(start))) start.setTime(start.getTime() - 86400000);
+  if (!days.has(isoDayLocal(start))) start.setDate(start.getDate() - 1);
   for (let i = 0; i < 3650; i++) {
-    const key = isoDayLocal(new Date(start.getTime() - i * 86400000));
-    if (!days.has(key)) break;
+    const d = new Date(start);
+    d.setDate(start.getDate() - i);
+    if (!days.has(isoDayLocal(d))) break;
     currentRun += 1;
   }
 
@@ -116,6 +122,12 @@ export function activitySummary(days: Map<string, ActivityDay>): ActivitySummary
     currentRun,
     busiest,
   };
+}
+
+/** Calendar day number for a "yyyy-mm-dd" key — noon-anchored so DST
+ *  offsets (±1h wall time) can never flip which day the number lands on. */
+function dayNum(dateKey: string): number {
+  return Math.floor(new Date(dateKey + "T12:00:00").getTime() / 86400000);
 }
 
 function maxWpm(a: number | null, b: number | null): number | null {

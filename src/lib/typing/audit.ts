@@ -442,7 +442,11 @@ export function buildTestAudit(
   const l10Wpm = avg(last10.map((h) => h.wpm));
   const l10Acc = avg(last10.map((h) => h.accuracy));
   const compare: AuditCompare = {
-    testNo: stats.history.length + 1,
+    // lifetime test number — stats.history is capped (MAX_HISTORY=500), so
+    // history.length+1 would stall at 501 for heavy users; the learning
+    // counter (already incremented for this test by finalizeLearning) is
+    // the uncapped truth. max() keeps the two consistent if they ever drift.
+    testNo: Math.max(stats.history.length + 1, learning.totalTests),
     prevBestWpm: prev ? prev.wpm : null,
     prevBestAcc: prev ? prev.accuracy : null,
     pbDelta: prev ? result.wpm - prev.wpm : null,

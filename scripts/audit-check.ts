@@ -155,6 +155,11 @@ check("pbDelta = 61-68", audit.compare.pbDelta === -7, `got ${audit.compare.pbDe
 check("last10 avg ~56.5 -> 57", audit.compare.last10Wpm !== null && audit.compare.last10Wpm >= 56 && audit.compare.last10Wpm <= 57, `got ${audit.compare.last10Wpm}`);
 check("wpmDelta +4/+5", (audit.compare.wpmDelta ?? 0) >= 4 && (audit.compare.wpmDelta ?? 0) <= 5, `got ${audit.compare.wpmDelta}`);
 
+// testNo must use the LIFETIME counter once history hits its 500 cap
+const cappedLearning = { ...emptyLearning(), totalTests: 847 };
+const cappedAudit = buildTestAudit(result, events, targets, typed, stats, cappedLearning);
+check("testNo uses lifetime counter past history cap", cappedAudit.compare.testNo === 847, `got ${cappedAudit.compare.testNo}`);
+
 console.log("generateInsights (shared analysis path):");
 const insights = generateInsights(result, events, stats, learning, undefined, stats.personalBests["adaptive 25"]);
 check("insights generated", Array.isArray(insights) && insights.length > 0, `got ${insights.length}`);
