@@ -140,7 +140,10 @@ export function sanitizeMem(raw: unknown, fallbackErrRate: number, fallbackAttem
     if (fallbackAttempts > 0) return seedMemFromHistory(fallbackErrRate, fallbackAttempts, lastSeen);
     return null;
   }
-  const last = v.last === null ? null : num(v.last, 0, Number.MAX_SAFE_INTEGER, Date.now() - 86400000);
+  // A reviewed card with no last-review timestamp would break retrievability
+  // forever (R reads as 0 → the item sits at max urgency and is drilled
+  // every single test). Coerce to a day ago so scheduling stays sane.
+  const last = v.last === null ? Date.now() - 86400000 : num(v.last, 0, Number.MAX_SAFE_INTEGER, Date.now() - 86400000);
   return {
     s: num(v.s, 0, 240, 0.2),
     d: num(v.d, 1, 10, 5),

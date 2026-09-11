@@ -160,10 +160,10 @@ async function fetchQuotePack(): Promise<Array<{ text: string; author: string }>
 // ---------------------------------------------------------------------------
 
 /**
- * Boot: hydrate cached packs (works with zero network), then refresh in the
- * background if the browser is currently online and packs are enabled.
+ * Hydrate cached packs (works with zero network). Pure — never fetches.
+ * The page owns the refresh decision (weekly-gated + online-event driven).
  */
-export function initPacks(enabled: boolean): void {
+function initPacks(enabled: boolean): void {
   const online = typeof navigator !== "undefined" ? navigator.onLine : false;
   setState({ online });
 
@@ -188,7 +188,7 @@ export function initPacks(enabled: boolean): void {
   if (restored) {
     const sizes = packSizes();
     setState({
-      status: online ? "ready" : "ready",
+      status: "ready",
       cachedOnly: !online,
       extraWords: sizes.common,
       extraQuotes: sizes.quotes,
@@ -196,12 +196,23 @@ export function initPacks(enabled: boolean): void {
     });
   }
 
-  if (online) void refreshPacks(enabled);
+  // NOTE: no fetch here. initPacks is pure hydration — the page owns the
+  // refresh decision (weekly-gated + online-event driven) so boot can never
+  // fire overlapping fetches from multiple effects.
 }
 
-/** Fetch both packs, validate, merge, cache. Safe to call repeatedly. */
-export async function refreshPacks(enabled: boolean): Promise<void> {
-  if (!enabled) return;
+/** Fetch both packs, validate, merge, cache. Concurrent calls share one fetch. */
+let refreshInFlight: Promise<void> | null = null;
+export function refreshPacks(enabled: boolean): Promise<void> {
+  if (!enabled) return Promise.resolve();
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = doRefreshPacks().finally(() => {
+    refreshInFlight = null;
+  });
+  return refreshInFlight;
+}
+
+async function doRefreshPacks(): Promise<void> {
   const online = typeof navigator !== "undefined" ? navigator.onLine : false;
   setState({ online });
   if (!online) {
@@ -267,7 +278,7 @@ export function setPacksEnabled(enabled: boolean): void {
     setState({ status: "off", extraWords: 0, extraQuotes: 0, cachedOnly: false });
   } else {
     const online = typeof navigator !== "undefined" ? navigator.onLine : false;
-    // hydrate from cache immediately, then refresh if online
+    // hydrate from cache immediately; the page drives any refresh
     initPacks(true);
     if (!online) setState({ status: state.extraWords > 0 ? "ready" : "local", cachedOnly: state.extraWords > 0 });
   }

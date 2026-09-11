@@ -137,10 +137,58 @@ export function sanitizeStats(raw: unknown): StatsData {
   if (!isPlainObject(raw)) return base;
   const p = raw as Partial<StatsData>;
 
+  // History entries are untrusted too: `{"wpm": 1e999}` parses as Infinity,
+  // hand-edited fields can be negative/strings — every numeric field is
+  // clamped and arrays truncated so charts/insights math can never see NaN.
+  const MAX_SAMPLES = 7200; // 2h at 1Hz
   const history = Array.isArray(p.history)
-    ? p.history.filter(
-        (h): h is TestResult => isPlainObject(h) && typeof h.id === "string" && typeof h.wpm === "number"
-      )
+    ? p.history
+        .filter(
+          (h): h is TestResult =>
+            isPlainObject(h) && typeof (h as Partial<TestResult>).id === "string" && typeof (h as Partial<TestResult>).wpm === "number"
+        )
+        .slice(0, MAX_HISTORY)
+        .map((h) => {
+          const charsSrc: Record<string, unknown> = isPlainObject(h.chars) ? h.chars : {};
+          const samples = Array.isArray(h.samples)
+            ? h.samples
+                .filter(
+                  (s): s is TestResult["samples"][number] =>
+                    isPlainObject(s) &&
+                    typeof (s as Partial<TestResult["samples"][number]>).second === "number" &&
+                    typeof (s as Partial<TestResult["samples"][number]>).wpm === "number"
+                )
+                .slice(0, MAX_SAMPLES)
+                .map((s) => ({
+                  second: Math.round(clampNum(s.second, 0, 7200, 0)),
+                  wpm: clampNum(s.wpm, 0, 500, 0),
+                  raw: clampNum(s.raw, 0, 700, 0),
+                  errors: Math.round(clampNum(s.errors, 0, 1e6, 0)),
+                }))
+            : [];
+          return {
+            id: h.id.slice(0, 64),
+            timestamp: clampNum(h.timestamp, 0, Number.MAX_SAFE_INTEGER, 0),
+            mode: oneOf(h.mode, TEST_MODES, "words" as Settings["mode"]),
+            modeLabel: typeof h.modeLabel === "string" && h.modeLabel ? h.modeLabel.slice(0, 60) : "unknown",
+            wpm: clampNum(h.wpm, 0, 500, 0),
+            rawWpm: clampNum(h.rawWpm, 0, 700, 0),
+            accuracy: clampNum(h.accuracy, 0, 100, 0),
+            consistency: clampNum(h.consistency, 0, 100, 0),
+            duration: clampNum(h.duration, 0, 36000, 0),
+            chars: {
+              correct: Math.round(clampNum(charsSrc.correct, 0, 1e7, 0)),
+              incorrect: Math.round(clampNum(charsSrc.incorrect, 0, 1e7, 0)),
+              extra: Math.round(clampNum(charsSrc.extra, 0, 1e7, 0)),
+              missed: Math.round(clampNum(charsSrc.missed, 0, 1e7, 0)),
+            },
+            samples,
+            focusKeys: Array.isArray(h.focusKeys)
+              ? h.focusKeys.filter((k): k is string => typeof k === "string").slice(0, 8)
+              : [],
+            isPersonalBest: boolOr(h.isPersonalBest, false),
+          };
+        })
     : base.history;
 
   const personalBests: StatsData["personalBests"] = {};
@@ -204,6 +252,24 @@ export function loadLearning(): LearningData {
     return sanitizeLearning(JSON.parse(raw));
   } catch {
     return emptyLearning();
+  }
+}
+
+/**
+ * Schema version recorded in the persisted learning payload (0 if absent or
+ * corrupt). Lets the page detect "stored < current" migrations without
+ * reaching into raw localStorage keys from outside this module.
+ */
+export function storedLearningVersion(): number {
+  const raw = safeGet(KEYS.learning);
+  if (!raw) return 0;
+  try {
+    const p = JSON.parse(raw) as { lastVersion?: unknown };
+    return typeof p.lastVersion === "number" && Number.isFinite(p.lastVersion)
+      ? Math.max(0, Math.floor(p.lastVersion))
+      : 0;
+  } catch {
+    return 0;
   }
 }
 

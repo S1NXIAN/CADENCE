@@ -34,11 +34,11 @@ echo "=== 2. full-potential layer ==="
 sleep 4  # give pack fetch time
 agent-browser eval "(document.querySelector('[data-testid=\"connection-badge\"]') || {}).textContent || 'NO-BADGE'" > $TMP 2>/dev/null
 echo "badge: $(decode)"
-agent-browser eval "(() => { const w = localStorage.getItem('cadence.pack.words.v1'); if (!w) return 'no-cache'; const p = JSON.parse(w); return 'cached ' + p.words.length + ' words'; })()" > $TMP 2>/dev/null
+agent-browser eval "(() => { const w = localStorage.getItem('cadence.pack.words.v2'); if (!w) return 'no-cache'; const p = JSON.parse(w); return 'cached ' + p.words.length + ' words'; })()" > $TMP 2>/dev/null
 echo "word pack cache: $(decode)"
 agent-browser eval "(() => { const q = localStorage.getItem('cadence.pack.quotes.v1'); if (!q) return 'no-cache'; const p = JSON.parse(q); return 'cached ' + p.quotes.length + ' quotes'; })()" > $TMP 2>/dev/null
 echo "quote pack cache: $(decode)"
-agent-browser eval "(() => { const w = localStorage.getItem('cadence.pack.words.v1'); if (!w) process.exit(1); const p = JSON.parse(w); const bad = p.words.filter(x => !/^[a-z]{2,14}$/.test(x)); return 'invalid: ' + bad.length; })()" > $TMP 2>/dev/null || true
+agent-browser eval "(() => { const w = localStorage.getItem('cadence.pack.words.v2'); if (!w) process.exit(1); const p = JSON.parse(w); const bad = p.words.filter(x => !/^[a-z]{2,14}$/.test(x)); return 'invalid: ' + bad.length; })()" > $TMP 2>/dev/null || true
 echo "pack validation: $(decode)"
 
 echo "=== 3. v2 -> v3 migration ==="

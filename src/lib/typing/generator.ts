@@ -72,17 +72,6 @@ const KEY_GAIN_SHARE = 0.5; // per-key targets weigh half of per-bigram targets
 const MIN_URGENCY = 0.07; // below this an item isn't worth targeted drilling
 const JITTER = 0.5; // randomization on gain so consecutive tests differ
 
-const bigramCache = new Map<string, string[]>();
-function bigramsOf(word: string): string[] {
-  let bgs = bigramCache.get(word);
-  if (!bgs) {
-    bgs = [];
-    for (let i = 0; i < word.length - 1; i++) bgs.push(word.slice(i, i + 2));
-    bigramCache.set(word, bgs);
-  }
-  return bgs;
-}
-
 function greedyCover(
   pool: string[],
   targetKeys: Map<string, number>,
@@ -94,32 +83,46 @@ function greedyCover(
   const picked: string[] = [];
   const pickedSet = new Set<string>();
 
+  // Precompute each word's target contributions ONCE (per test) instead of
+  // rescanning every bigram/char of the full pool on every slot. With a ~12k
+  // pool and 100-word tests this removes ~95% of the cover-loop work; words
+  // with zero target hits never enter the candidate list at all.
+  //   kind 0 = bigram target, kind 1 = key target (already × KEY_GAIN_SHARE)
+  interface Hit { k: 0 | 1; id: string; u: number }
+  const candidates: Array<{ w: string; hits: Hit[]; invSqrtLen: number }> = [];
+  for (const w of pool) {
+    const hits: Hit[] = [];
+    for (let i = 0; i < w.length - 1; i++) {
+      const u = targetBgs.get(w.slice(i, i + 2));
+      if (u !== undefined) hits.push({ k: 0, id: w.slice(i, i + 2), u });
+    }
+    if (targetKeys.size) {
+      for (const ch of w) {
+        const u = targetKeys.get(ch);
+        if (u !== undefined) hits.push({ k: 1, id: ch, u: u * KEY_GAIN_SHARE });
+      }
+    }
+    if (hits.length) candidates.push({ w, hits, invSqrtLen: 1 / Math.sqrt(w.length) });
+  }
+
   while (picked.length < slots) {
     let best: string | null = null;
     let bestGain = 0;
 
-    for (const w of pool) {
-      if (pickedSet.has(w)) continue;
-      const bgs = bigramsOf(w);
+    for (const c of candidates) {
+      if (pickedSet.has(c.w)) continue;
       let gain = 0;
-      for (const bg of bgs) {
-        const u = targetBgs.get(bg);
-        if (u !== undefined) gain += u * Math.pow(COVERAGE_DECAY, covBg.get(bg) ?? 0);
+      for (const h of c.hits) {
+        const cov = h.k === 0 ? covBg.get(h.id) : covKey.get(h.id);
+        gain += h.u * Math.pow(COVERAGE_DECAY, cov ?? 0);
       }
-      if (targetKeys.size) {
-        for (const ch of w) {
-          const u = targetKeys.get(ch);
-          if (u !== undefined) gain += u * KEY_GAIN_SHARE * Math.pow(COVERAGE_DECAY, covKey.get(ch) ?? 0);
-        }
-      }
-      if (gain <= 0) continue;
       // efficiency: dense coverage per keystroke beats long words that pad
-      gain /= Math.sqrt(w.length);
+      gain *= c.invSqrtLen;
       // jitter keeps consecutive tests from converging on identical picks
       gain *= 1 - JITTER / 2 + Math.random() * JITTER;
       if (gain > bestGain) {
         bestGain = gain;
-        best = w;
+        best = c.w;
       }
     }
 
@@ -127,7 +130,8 @@ function greedyCover(
 
     picked.push(best);
     pickedSet.add(best);
-    for (const bg of bigramsOf(best)) {
+    for (let i = 0; i < best.length - 1; i++) {
+      const bg = best.slice(i, i + 2);
       if (targetBgs.has(bg)) covBg.set(bg, (covBg.get(bg) ?? 0) + 1);
     }
     for (const ch of best) {
@@ -180,14 +184,15 @@ function interleave(words: string[], drillSet: Set<string>, intensity01: number)
  * Adaptive curation, v2: FSRS urgency ranks the targets, greedy weighted
  * set-cover buys maximal weak-spot coverage per test, flow words keep the
  * rhythm natural. intensity (0..100) controls the drill/flow ratio.
+ * Exported (with the drill partition) for probe/test tooling.
  */
-function generateAdaptive(
+export function generateAdaptive(
   learning: LearningData,
   count: number,
   intensity: number,
   withPunct: boolean,
   withNumbers: boolean
-): { words: string[]; focusKeys: string[] } {
+): { words: string[]; focusKeys: string[]; drills: string[] } {
   const urgentKeys = keyUrgencies(learning).filter((u) => u.urgency > MIN_URGENCY).slice(0, 8);
   const urgentBgs = bigramUrgencies(learning).filter((u) => u.urgency > MIN_URGENCY).slice(0, 14);
   const hasSignal = learning.totalTests >= 1 && (urgentKeys.length > 0 || urgentBgs.length > 0);
@@ -198,6 +203,7 @@ function generateAdaptive(
 
   let words: string[] = [];
   let focusKeys: string[] = [];
+  let drills: string[] = [];
 
   if (!hasSignal) {
     // calibration run: plain sample from the pool
@@ -206,15 +212,20 @@ function generateAdaptive(
     const targetKeys = new Map(urgentKeys.map((u) => [u.key, u.urgency]));
     const targetBgs = new Map(urgentBgs.map((u) => [u.bigram, u.urgency]));
     const targetDrill = Math.round(count * (0.25 + 0.55 * intensity01));
-    const drills = greedyCover(pool, targetKeys, targetBgs, targetDrill);
+    drills = greedyCover(pool, targetKeys, targetBgs, targetDrill);
     focusKeys = urgentKeys.slice(0, 3).map((u) => u.key);
 
+    // sampleFlow ADDS its picks to the exclude set it receives (to avoid
+    // duplicates) — pass a COPY so drillSet stays the pure drill partition
+    // that interleave needs. Sharing it used to collapse the partition (every
+    // word looked like a drill) and interleave degenerated to a no-op, which
+    // bunched all drill words into one leading block.
     const drillSet = new Set(drills);
-    const flow = sampleFlow(common, count - drills.length, drillSet);
+    const flow = sampleFlow(common, count - drills.length, new Set(drillSet));
     words = interleave([...drills, ...flow], drillSet, intensity01);
   }
 
-  return { words: withTransforms(words, withPunct, withNumbers), focusKeys };
+  return { words: withTransforms(words, withPunct, withNumbers), focusKeys, drills };
 }
 
 function generateTime(

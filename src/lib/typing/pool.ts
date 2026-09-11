@@ -59,6 +59,7 @@ export interface PackContribution {
 
 /** Merge a content pack into the active pools (deduped, validated). */
 export function registerPack(c: PackContribution): void {
+  let changed = false;
   if (c.common) {
     const existing = new Set(getCommonPool());
     const add: string[] = [];
@@ -68,12 +69,18 @@ export function registerPack(c: PackContribution): void {
         add.push(w);
       }
     }
-    packCommon = Array.from(new Set([...packCommon, ...add]));
+    if (add.length) {
+      packCommon = Array.from(new Set([...packCommon, ...add]));
+      changed = true;
+    }
   }
   if (c.hard) {
-    const existing = new Set(HARD_WORDS);
+    const existing = new Set([...HARD_WORDS, ...packHard]);
     const add = validWords(c.hard, MAX_PACK_WORDS).filter((w) => !existing.has(w));
-    packHard = Array.from(new Set([...packHard, ...add]));
+    if (add.length) {
+      packHard = Array.from(new Set([...packHard, ...add]));
+      changed = true;
+    }
   }
   if (c.quotes) {
     const seen = new Set(getQuotes().map((q) => q.text.slice(0, 60)));
@@ -83,17 +90,24 @@ export function registerPack(c: PackContribution): void {
       seen.add(key);
       return true;
     });
-    packQuotes = [...packQuotes, ...add];
+    if (add.length) {
+      packQuotes = [...packQuotes, ...add];
+      changed = true;
+    }
   }
-  invalidate();
+  // no-op re-registrations (e.g. re-hydrating identical cached packs) must
+  // not invalidate the pools — downstream that would needlessly regenerate
+  // the idle test
+  if (changed) invalidate();
 }
 
 /** Drop all pack content — back to the pure static dictionary. */
 export function clearPacks(): void {
+  const had = packCommon.length > 0 || packHard.length > 0 || packQuotes.length > 0;
   packCommon = [];
   packHard = [];
   packQuotes = [];
-  invalidate();
+  if (had) invalidate();
 }
 
 /** Everyday words (static CORE+EXTENDED+GENERATED plus pack common words). */

@@ -14,12 +14,12 @@ import {
 import { generateInsights, nextTestPreview } from "@/lib/typing/insights";
 import { onPacksChanged } from "@/lib/typing/pool";
 import {
-  initPacks, setPacksEnabled, handleOnline, handleOffline, packRefreshDue, refreshPacks,
+  setPacksEnabled, handleOnline, handleOffline, packRefreshDue, refreshPacks,
 } from "@/lib/typing/online-pack";
 import { ConnectionBadge } from "@/components/typing/connection-badge";
 import {
   exportData, emptyStats, importData, isOnboarded, loadLearning, loadSettings,
-  loadStats, persistAll, recordResult, saveLearning, saveSettings, setOnboarded, wipeAll,
+  loadStats, persistAll, recordResult, saveLearning, saveSettings, setOnboarded, storedLearningVersion, wipeAll,
 } from "@/lib/typing/storage";
 import type { CharEvent, CoachInsight, LearningData, Settings, StatsData, TestResult } from "@/lib/typing/types";
 import { ACCENT_COLORS, DEFAULT_SETTINGS } from "@/lib/typing/types";
@@ -61,16 +61,8 @@ export default function Page() {
     setLearning(loadedLearning);
     // durable schema migration: if stored learning was an older version
     // (e.g. v2 EWMA -> v3 FSRS memory), write the upgraded payload back once
-    try {
-      const raw = window.localStorage.getItem("cadence.learning.v1");
-      if (raw) {
-        const stored = JSON.parse(raw) as { lastVersion?: number };
-        if ((stored.lastVersion ?? 0) < loadedLearning.lastVersion) {
-          saveLearning(loadedLearning);
-        }
-      }
-    } catch {
-      /* ignore corrupt payloads — sanitizeLearning already degraded them */
+    if (storedLearningVersion() < loadedLearning.lastVersion) {
+      saveLearning(loadedLearning);
     }
     setStats(loadStats());
     setOnboardedState(isOnboarded());
@@ -78,12 +70,12 @@ export default function Page() {
   }, []);
 
   // ---- full-potential layer (WiFi/online detection, cached content packs) --
+  // Effect 1 owns ONLY the browser connectivity events; Effect 2 owns pack
+  // lifecycle (hydrate + at most ONE weekly-gated refresh). Splitting them
+  // this way guarantees a single fetch path per trigger — earlier both
+  // effects could (and did) kick off overlapping fetches on boot.
   useEffect(() => {
     if (!ready) return;
-    initPacks(settingsRef.current.onlinePacks);
-    if (settingsRef.current.onlinePacks && navigator.onLine && packRefreshDue()) {
-      void refreshPacks(true);
-    }
     const onOnline = () => handleOnline(settingsRef.current.onlinePacks);
     const onOffline = () => handleOffline();
     window.addEventListener("online", onOnline);
@@ -94,19 +86,34 @@ export default function Page() {
     };
   }, [ready]);
 
-  // apply pack enable/disable when the setting changes
+  // apply pack lifecycle whenever readiness or the toggle changes (including boot)
   useEffect(() => {
     if (!ready) return;
     setPacksEnabled(settings.onlinePacks);
+    if (settings.onlinePacks && navigator.onLine && packRefreshDue()) {
+      void refreshPacks(true);
+    }
   }, [ready, settings.onlinePacks]);
 
   // when packs finish loading mid-session-idle, refresh the current test so
-  // the expanded vocabulary is immediately live (never mid-test)
+  // the expanded vocabulary is immediately live (never mid-test). Debounced:
+  // pack arrival lands as several registerPack calls (words, quotes, live
+  // refresh) and each would otherwise regenerate the idle test separately.
   useEffect(() => {
     if (!ready) return;
-    return onPacksChanged(() => {
-      if (sessionRef.current.status === "idle") sessionRef.current.restart();
+    let timer: number | null = null;
+    const unsub = onPacksChanged(() => {
+      if (sessionRef.current.status !== "idle") return;
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
+        if (sessionRef.current.status === "idle") sessionRef.current.restart();
+      }, 150);
     });
+    return () => {
+      unsub();
+      if (timer !== null) window.clearTimeout(timer);
+    };
   }, [ready]);
 
   // ---- accent theming -----------------------------------------------------
@@ -160,7 +167,7 @@ export default function Page() {
       setOnboarded();
 
       // update learning model (keystroke-level) + FSRS memory reviews
-      const updatedLearning = JSON.parse(JSON.stringify(learningRef.current)) as LearningData;
+      const updatedLearning = cloneLearning(learningRef.current);
       const tally = ingestEvents(updatedLearning, events, result.duration * 1000);
       finalizeLearning(updatedLearning, tally);
       setLearning(updatedLearning);
@@ -514,6 +521,13 @@ export default function Page() {
       />
     </div>
   );
+}
+
+function cloneLearning(l: LearningData): LearningData {
+  // structuredClone is faster and less GC-hostile than the JSON round-trip;
+  // the JSON fallback keeps very old browsers alive
+  if (typeof structuredClone === "function") return structuredClone(l);
+  return JSON.parse(JSON.stringify(l)) as LearningData;
 }
 
 function doExport(settings: Settings, learning: LearningData, stats: StatsData) {
