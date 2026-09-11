@@ -1,10 +1,12 @@
 /**
  * Dictionary audit: pool sizes, duplicates, per-letter coverage,
- * repetition math, and adaptive drill-pool capacity.
+ * repetition math, and adaptive set-cover drill capacity.
  * Run: bun scripts/dict-audit.ts
  */
 import { COMMON_WORDS, HARD_WORDS } from "../src/lib/typing/words";
 import { computeWeakKeys, weakBigrams, emptyLearning } from "../src/lib/typing/profiles";
+import { newMemCard, reviewMem } from "../src/lib/typing/memory";
+import { keyPrior } from "../src/lib/typing/motor";
 import type { LearningData } from "../src/lib/typing/types";
 
 function dupes(list: string[]): string[] {
@@ -27,41 +29,98 @@ function expectedUnique(poolSize: number, draws: number): number {
   return poolSize * (1 - Math.pow(1 - 1 / poolSize, draws));
 }
 
+function weakProfile(errRate: number, latency: number) {
+  const mem0 = newMemCard();
+  let mem = mem0;
+  for (let i = 0; i < 4; i++) mem = reviewMem(mem, "again");
+  return { attempts: 40, errors: Math.round(40 * errRate), errRate, latency, lastSeen: Date.now(), mem };
+}
+
 // synthetic learning data resembling a real intermediate typist
 function learningWithSignal(): LearningData {
-  const l = emptyLearning() as LearningData;
+  const l = emptyLearning();
   l.totalTests = 12;
   const weak: Array<[string, number, number]> = [
     ["q", 0.28, 380], ["p", 0.22, 340], ["y", 0.19, 330], ["b", 0.15, 310],
     ["v", 0.12, 300], ["x", 0.1, 290], ["z", 0.08, 280], ["u", 0.06, 270],
   ];
   for (const [k, err, lat] of weak) {
-    l.keyProfiles[k] = { attempts: 40, errRate: err, latency: lat, lastSeen: Date.now() };
+    l.keyProfiles[k] = weakProfile(err, lat);
   }
   for (const bg of ["qu", "th", "io", "we", "yp"]) {
-    l.bigramProfiles[bg] = { attempts: 30, errRate: 0.25, latency: 290, lastSeen: Date.now() };
+    l.bigramProfiles[bg] = weakProfile(0.25, 290);
   }
   return l;
 }
 
-function drillCandidateCount(learning: LearningData): { candidates: number; distinct: number } {
-  // mirrors generateAdaptive's drill-candidate selection
-  const weakKeys = computeWeakKeys(learning).slice(0, 10);
-  const weakBgs = weakBigrams(learning, 12);
-  const keyWeakness = new Map(weakKeys.map((w) => [w.key, w.weakness]));
-  const bgWeakness = new Map(weakBgs.map((w) => [w.bigram, w.weakness]));
-  const topWeak = new Set(weakKeys.slice(0, 4).map((w) => w.key));
-  const pool = [...COMMON_WORDS, ...HARD_WORDS];
-  const scored = pool.map((w) => {
-    let score = 0;
-    for (const ch of w) score += keyWeakness.get(ch) ?? 0;
-    for (let i = 0; i < w.length - 1; i++) score += (bgWeakness.get(w.slice(i, i + 2)) ?? 0) * 1.4;
-    for (const k of topWeak) if (w.includes(k)) score += 0.35;
-    return { word: w, score };
-  });
-  scored.sort((a, b) => b.score - a.score);
-  const candidates = scored.slice(0, Math.max(60, Math.floor(scored.length * 0.45)));
-  return { candidates: candidates.length, distinct: new Set(candidates.map((c) => c.word)).size };
+// mirror of generateAdaptive's set-cover: how much weak-target urgency does a
+// single 25-word drill actually buy, and how many distinct weak items get hit?
+function setCoverCapacity(learning: LearningData) {
+  const weakKeys = computeWeakKeys(learning).filter((w) => w.weakness > 0.07).slice(0, 8);
+  const weakBgs = weakBigrams(learning, 14).filter((w) => w.weakness > 0.07);
+  const targetKeys = new Map(weakKeys.map((w) => [w.key, w.weakness]));
+  const targetBgs = new Map(weakBgs.map((w) => [w.bigram, w.weakness]));
+
+  const pool = [...new Set([...COMMON_WORDS, ...HARD_WORDS])];
+  const DECAY = 0.42;
+  const covBg = new Map<string, number>();
+  const covKey = new Map<string, number>();
+  const picked: string[] = [];
+  const slots = 25;
+
+  while (picked.length < slots) {
+    let best: string | null = null;
+    let bestGain = 0;
+    for (const w of pool) {
+      if (picked.includes(w)) continue;
+      let gain = 0;
+      for (let i = 0; i < w.length - 1; i++) {
+        const u = targetBgs.get(w.slice(i, i + 2));
+        if (u !== undefined) gain += u * Math.pow(DECAY, covBg.get(w.slice(i, i + 2)) ?? 0);
+      }
+      for (const ch of w) {
+        const u = targetKeys.get(ch);
+        if (u !== undefined) gain += u * 0.5 * Math.pow(DECAY, covKey.get(ch) ?? 0);
+      }
+      if (gain <= 0) continue;
+      gain /= Math.sqrt(w.length);
+      if (gain > bestGain) {
+        bestGain = gain;
+        best = w;
+      }
+    }
+    if (best === null) break;
+    picked.push(best);
+    for (let i = 0; i < best.length - 1; i++) {
+      const bg = best.slice(i, i + 2);
+      if (targetBgs.has(bg)) covBg.set(bg, (covBg.get(bg) ?? 0) + 1);
+    }
+    for (const ch of best) {
+      if (targetKeys.has(ch)) covKey.set(ch, (covKey.get(ch) ?? 0) + 1);
+    }
+  }
+
+  const totalBgUrgency = [...targetBgs.values()].reduce((a, b) => a + b, 0);
+  const totalKeyUrgency = [...targetKeys.values()].reduce((a, b) => a + b, 0);
+  const gainedBg = [...covBg.entries()].reduce(
+    (a, [bg, n]) => a + (targetBgs.get(bg) ?? 0) * (1 - Math.pow(DECAY, n)) / (1 - DECAY),
+    0
+  );
+  const gainedKey = [...covKey.entries()].reduce(
+    (a, [ch, n]) => a + (targetKeys.get(ch) ?? 0) * 0.5 * (1 - Math.pow(DECAY, n)) / (1 - DECAY),
+    0
+  );
+  return {
+    drillWords: picked.length,
+    sample: picked.slice(0, 8),
+    bigramsHit: covBg.size,
+    bigramsTotal: targetBgs.size,
+    keysHit: covKey.size,
+    keysTotal: targetKeys.size,
+    coveragePct: Math.round(
+      ((gainedBg + gainedKey) / Math.max(1e-9, totalBgUrgency + 0.5 * totalKeyUrgency)) * 100
+    ),
+  };
 }
 
 // ---- report ----
@@ -77,7 +136,7 @@ console.log("=== POOL SIZES ===");
 console.log(`COMMON_WORDS: ${COMMON_WORDS.length} entries, ${commonUnique} unique${commonDupes.length ? ` | DUPLICATES: ${commonDupes.join(", ")}` : ""}`);
 console.log(`HARD_WORDS:   ${HARD_WORDS.length} entries, ${hardUnique} unique${hardDupes.length ? ` | DUPLICATES: ${hardDupes.join(", ")}` : ""}`);
 console.log(`cross-list overlap (in both): ${overlap.length ? overlap.join(", ") : "none"}`);
-if (validCommon.invalid.length) console.log(`INVALID COMMON: ${validCommon.invalid.join(", ")}`);
+if (validCommon.invalid.length) console.log(`INVALID COMMON: ${validCommon.invalid.slice(0, 20).join(", ")}${validCommon.invalid.length > 20 ? ` (+${validCommon.invalid.length - 20} more)` : ""}`);
 if (validHard.invalid.length) console.log(`INVALID HARD: ${validHard.invalid.join(", ")}`);
 
 console.log("\n=== PER-LETTER COVERAGE (words containing letter, common+hard unique) ===");
@@ -101,9 +160,16 @@ for (const sec of [30, 60, 120]) {
   console.log(`time ${sec}s (~${draws} words): expect ${u.toFixed(0)} distinct (~${(draws - u).toFixed(0)} repeats, ${(((draws - u) / draws) * 100).toFixed(0)}% repeated)`);
 }
 
-console.log("\n=== ADAPTIVE DRILL CAPACITY (intermediate typist, weak q/p/y/b/v/x/z/u) ===");
-const dc = drillCandidateCount(learningWithSignal());
-console.log(`drill candidate window: ${dc.candidates} entries, ${dc.distinct} distinct`);
-for (const ch of ["q", "x", "z", "j", "v", "k"]) {
-  console.log(`words containing '${ch}': ${pool.filter((w) => w.includes(ch)).length}`);
-}
+console.log("\n=== ADAPTIVE SET-COVER CAPACITY (intermediate typist, weak q/p/y/b/v/x/z/u) ===");
+const cap = setCoverCapacity(learningWithSignal());
+console.log(`drill words in a 25-word test: ${cap.drillWords}`);
+console.log(`weak bigrams covered: ${cap.bigramsHit}/${cap.bigramsTotal}   weak keys covered: ${cap.keysHit}/${cap.keysTotal}`);
+console.log(`weighted urgency coverage: ~${cap.coveragePct}%`);
+console.log(`sample drill words: ${cap.sample.join(" ")}`);
+
+console.log("\n=== MOTOR PRIORS (cold-start ranking) ===");
+const priorRank = letters
+  .map((ch) => ({ ch, rel: keyPrior(ch).err / 0.035 }))
+  .sort((a, b) => b.rel - a.rel);
+console.log(`hardest: ${priorRank.slice(0, 6).map((p) => `${p.ch}(${p.rel.toFixed(2)})`).join("  ")}`);
+console.log(`easiest: ${priorRank.slice(-5).map((p) => `${p.ch}(${p.rel.toFixed(2)})`).join("  ")}`);

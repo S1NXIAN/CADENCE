@@ -12,9 +12,14 @@ import {
   emptyLearning, finalizeLearning, ingestEvents,
 } from "@/lib/typing/profiles";
 import { generateInsights, nextTestPreview } from "@/lib/typing/insights";
+import { onPacksChanged } from "@/lib/typing/pool";
+import {
+  initPacks, setPacksEnabled, handleOnline, handleOffline, packRefreshDue, refreshPacks,
+} from "@/lib/typing/online-pack";
+import { ConnectionBadge } from "@/components/typing/connection-badge";
 import {
   exportData, emptyStats, importData, isOnboarded, loadLearning, loadSettings,
-  loadStats, persistAll, recordResult, saveSettings, setOnboarded, wipeAll,
+  loadStats, persistAll, recordResult, saveLearning, saveSettings, setOnboarded, wipeAll,
 } from "@/lib/typing/storage";
 import type { CharEvent, CoachInsight, LearningData, Settings, StatsData, TestResult } from "@/lib/typing/types";
 import { ACCENT_COLORS, DEFAULT_SETTINGS } from "@/lib/typing/types";
@@ -47,14 +52,62 @@ export default function Page() {
     learningRef.current = learning;
   }, [settings, learning]);
 
+  const sessionRef = useRef<{ status: string; restart: () => void }>({ status: "idle", restart: () => {} });
+
   // ---- load local data on mount ------------------------------------------
   useEffect(() => {
     setSettings(loadSettings());
-    setLearning(loadLearning());
+    const loadedLearning = loadLearning();
+    setLearning(loadedLearning);
+    // durable schema migration: if stored learning was an older version
+    // (e.g. v2 EWMA -> v3 FSRS memory), write the upgraded payload back once
+    try {
+      const raw = window.localStorage.getItem("cadence.learning.v1");
+      if (raw) {
+        const stored = JSON.parse(raw) as { lastVersion?: number };
+        if ((stored.lastVersion ?? 0) < loadedLearning.lastVersion) {
+          saveLearning(loadedLearning);
+        }
+      }
+    } catch {
+      /* ignore corrupt payloads — sanitizeLearning already degraded them */
+    }
     setStats(loadStats());
     setOnboardedState(isOnboarded());
     setReady(true);
   }, []);
+
+  // ---- full-potential layer (WiFi/online detection, cached content packs) --
+  useEffect(() => {
+    if (!ready) return;
+    initPacks(settingsRef.current.onlinePacks);
+    if (settingsRef.current.onlinePacks && navigator.onLine && packRefreshDue()) {
+      void refreshPacks(true);
+    }
+    const onOnline = () => handleOnline(settingsRef.current.onlinePacks);
+    const onOffline = () => handleOffline();
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, [ready]);
+
+  // apply pack enable/disable when the setting changes
+  useEffect(() => {
+    if (!ready) return;
+    setPacksEnabled(settings.onlinePacks);
+  }, [ready, settings.onlinePacks]);
+
+  // when packs finish loading mid-session-idle, refresh the current test so
+  // the expanded vocabulary is immediately live (never mid-test)
+  useEffect(() => {
+    if (!ready) return;
+    return onPacksChanged(() => {
+      if (sessionRef.current.status === "idle") sessionRef.current.restart();
+    });
+  }, [ready]);
 
   // ---- accent theming -----------------------------------------------------
   useEffect(() => {
@@ -106,10 +159,10 @@ export default function Page() {
     (result: TestResult, events: CharEvent[]) => {
       setOnboarded();
 
-      // update learning model (keystroke-level)
+      // update learning model (keystroke-level) + FSRS memory reviews
       const updatedLearning = JSON.parse(JSON.stringify(learningRef.current)) as LearningData;
-      ingestEvents(updatedLearning, events, result.duration * 1000);
-      finalizeLearning(updatedLearning);
+      const tally = ingestEvents(updatedLearning, events, result.duration * 1000);
+      finalizeLearning(updatedLearning, tally);
       setLearning(updatedLearning);
 
       // personal best + record
@@ -132,6 +185,10 @@ export default function Page() {
     onFinish: handleFinish,
     onKeystroke: playClick,
   });
+
+  useEffect(() => {
+    sessionRef.current = { status: session.status, restart: session.restart };
+  }, [session.status, session.restart]);
 
   const restartAll = useCallback(() => {
     session.restart();
@@ -298,6 +355,7 @@ export default function Page() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <ConnectionBadge />
           {stats.streakDays > 0 && (
             <span className="text-sub bg-elevated hidden items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-mono text-xs sm:inline-flex" style={{ borderColor: "#23252b" }}>
               🔥 {stats.streakDays}d

@@ -5,18 +5,26 @@
  */
 import { generateTest } from "../src/lib/typing/generator";
 import { emptyLearning } from "../src/lib/typing/profiles";
+import { newMemCard, reviewMem } from "../src/lib/typing/memory";
 import { DEFAULT_SETTINGS, type LearningData, type Settings } from "../src/lib/typing/types";
 
-// synthetic learning data with weak keys so the adaptive path has signal
+// synthetic learning data with weak keys so the adaptive path has signal.
+// Profiles are built through real FSRS reviews (same path the app uses).
+function weakProfile(errRate: number, latency: number) {
+  const mem = newMemCard();
+  let m = mem;
+  for (let i = 0; i < 4; i++) m = reviewMem(m, "again"); // build difficulty/lapses
+  return { attempts: 40, errors: Math.round(40 * errRate), errRate, latency, lastSeen: Date.now(), mem: m };
+}
 function learningWithSignal(): LearningData {
   const l = emptyLearning();
   l.totalTests = 5;
   const weak = ["q", "p", "y", ";", "x"];
   for (const k of weak) {
-    l.keyProfiles[k] = { attempts: 40, errRate: 0.3, latency: 320, lastSeen: Date.now() };
+    l.keyProfiles[k] = weakProfile(0.3, 320);
   }
   for (const bg of ["qu", "th", "io", "xy"]) {
-    l.bigramProfiles[bg] = { attempts: 30, errRate: 0.25, latency: 290, lastSeen: Date.now() };
+    l.bigramProfiles[bg] = weakProfile(0.25, 290);
   }
   l.confusions.push({ expected: "e", typed: "r", count: 4, lastSeen: Date.now() });
   l.errorContexts.push({ trigram: "the", count: 3, lastSeen: Date.now() });

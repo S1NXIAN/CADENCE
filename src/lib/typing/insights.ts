@@ -133,8 +133,8 @@ export function nextTestPreview(learning: LearningData, mode: string): string {
   if (learning.totalTests < 1) {
     return "Your first test calibrates the coach. From test 2 onward, every word is chosen for you.";
   }
-  const weak = computeWeakKeys(learning).slice(0, 3);
-  const bgs = weakBigrams(learning, 2);
+  const weak = computeWeakKeys(learning).filter((w) => w.weakness > 0.08).slice(0, 3);
+  const bgs = weakBigrams(learning, 2).filter((b) => b.weakness > 0.08);
   const parts: string[] = [];
   if (weak.length) parts.push(`keys ${weak.map((w) => `'${w.key}'`).join(", ")}`);
   if (bgs.length) parts.push(`pairs ${bgs.map((b) => `'${b.bigram}'`).join(", ")}`);

@@ -1,3 +1,5 @@
+import { GENERATED_WORDS } from "./words-generated";
+
 // Vocabulary pools for test generation. Static and bundled on purpose: Cadence
 // is local-first, so the dictionary ships with the app and never needs network.
 //
@@ -200,11 +202,13 @@ export const EXTENDED_WORDS: string[] = [
   "double", "third",
 ];
 
-// The full everyday pool: core + extended, deduplicated at module load.
+// The full everyday pool: core + extended + generated morphology, deduplicated
+// at module load. GENERATED_WORDS (words-generated.ts) adds systematic verb
+// forms, plurals, degrees and derivations — see scripts/expand-dict.ts.
 // (A few words also appear in HARD_WORDS below — that is fine; the adaptive
 // generator dedupes the merged pool it scores.)
 export const COMMON_WORDS: string[] = Array.from(
-  new Set([...CORE_WORDS, ...EXTENDED_WORDS])
+  new Set([...CORE_WORDS, ...EXTENDED_WORDS, ...GENERATED_WORDS])
 );
 
 export const HARD_WORDS: string[] = [

@@ -1,6 +1,6 @@
-import { COMMON_WORDS, HARD_WORDS, QUOTES } from "./words";
-import type { LearningData, Settings, TestMode, WeakKey } from "./types";
-import { computeWeakKeys, weakBigrams } from "./profiles";
+import type { LearningData, Settings, TestMode } from "./types";
+import { bigramUrgencies, keyUrgencies } from "./profiles";
+import { getAdaptivePool, getCommonPool, getQuotes } from "./pool";
 
 export interface GeneratedTest {
   words: string[];
@@ -47,106 +47,116 @@ function maybeNumber(): string {
   return String(Math.floor(Math.random() * 9000) + 10);
 }
 
-/**
- * Score a word by how much it exercises the typist's weak spots.
- */
-function scoreWord(
-  word: string,
-  keyWeakness: Map<string, number>,
-  bigramWeakness: Map<string, number>,
-  topWeak: Set<string>
-): number {
-  let score = 0;
-  for (const ch of word) {
-    score += keyWeakness.get(ch) ?? 0;
-  }
-  for (let i = 0; i < word.length - 1; i++) {
-    score += (bigramWeakness.get(word.slice(i, i + 2)) ?? 0) * 1.4;
-  }
-  // bonus if the word contains any of the top weak keys
-  for (const k of topWeak) {
-    if (word.includes(k)) score += 0.35;
-  }
-  return score;
-}
-
-/**
- * Adaptive curation: blend of weak-spot-heavy words + normal flow words.
- * intensity (0..100) controls the ratio.
- */
-function generateAdaptive(
-  learning: LearningData,
-  count: number,
-  intensity: number,
-  withPunct: boolean,
-  withNumbers: boolean
-): { words: string[]; focusKeys: string[] } {
-  const weakKeys: WeakKey[] = computeWeakKeys(learning).slice(0, 10);
-  const weakBgs = weakBigrams(learning, 12);
-
-  const keyWeakness = new Map<string, number>();
-  for (const wk of weakKeys) keyWeakness.set(wk.key, wk.weakness);
-  const bgWeakness = new Map<string, number>();
-  for (const wb of weakBgs) bgWeakness.set(wb.bigram, wb.weakness);
-  const topWeak = new Set(weakKeys.slice(0, 4).map((w) => w.key));
-
-  // dedupe: a handful of words legitimately exist in both lists; scoring them
-  // twice would double-count them in the drill-candidate window
-  const pool = Array.from(new Set([...COMMON_WORDS, ...HARD_WORDS]));
-  const intensity01 = Math.max(0, Math.min(1, intensity / 100));
-
-  // If we don't know the typist yet, fall back to a normal word test
-  const hasSignal = weakKeys.length > 0 && learning.totalTests >= 1;
-
-  const scored = pool.map((w) => ({
-    word: w,
-    score: hasSignal ? scoreWord(w, keyWeakness, bgWeakness, topWeak) : Math.random() * 0.1,
-  }));
-  scored.sort((a, b) => b.score - a.score);
-
-  const targetDrill = Math.round(count * (0.25 + 0.55 * intensity01));
-  const targetFlow = count - targetDrill;
-
-  const words: string[] = [];
-
-  // drill words: drawn from the highest-scored words, with randomness in top 45%
-  const drillCandidates = scored.slice(0, Math.max(60, Math.floor(scored.length * 0.45)));
-  const drillSet = new Set<string>();
-  let guard = 0;
-  while (drillSet.size < targetDrill && guard < 500) {
-    const candidate = drillCandidates[rand(drillCandidates.length)].word;
-    // count integrity: only UNIQUE picks may be pushed, otherwise the drill
-    // loop overshoots and the finished test has more words than requested
-    // ("adaptive 25" that actually contains 27 words). Adjacent duplicates
-    // are skipped too, to avoid immediate repetition.
-    if (drillSet.has(candidate) || words[words.length - 1] === candidate) {
-      guard++;
-      continue;
-    }
-    drillSet.add(candidate);
-    words.push(candidate);
-    guard++;
-  }
-
-  // flow words: random common words to keep rhythm natural
-  const flowPool = shuffle(COMMON_WORDS);
-  let fi = 0;
-  while (words.length < count && fi < flowPool.length) {
-    const w = flowPool[fi++];
-    if (!drillSet.has(w)) words.push(w);
-  }
-
-  // interleave drill + flow for rhythm (already mixed by construction order, reshuffle lightly)
-  const mixed = interleave(words, drillSet, intensity01);
-
-  const finalWords = mixed.map((w) => {
+function withTransforms(words: string[], withPunct: boolean, withNumbers: boolean): string[] {
+  return words.map((w) => {
     let out = w;
     if (withNumbers && Math.random() < 0.08) out = maybeNumber();
     if (withPunct) out = applyPunctuation(out);
     return out;
   });
+}
 
-  return { words: finalWords, focusKeys: weakKeys.slice(0, 3).map((w) => w.key) };
+// ---------------------------------------------------------------------------
+// Set-cover curation.
+//
+// The old approach *ranked* words by weakness and sampled the top slice —
+// rare-but-weak bigrams starved because few words contain them. The set-cover
+// approach flips the objective: pick the word whose UNCOVERED weak-bigram
+// gain is highest, right now, with diminishing returns per repeat coverage.
+// Every drill slot buys the most useful new coverage, so even a bigram that
+// lives in only three English words gets those words into the test.
+// ---------------------------------------------------------------------------
+
+const COVERAGE_DECAY = 0.42; // 2nd coverage of the same target ≈ 42% of its gain
+const KEY_GAIN_SHARE = 0.5; // per-key targets weigh half of per-bigram targets
+const MIN_URGENCY = 0.07; // below this an item isn't worth targeted drilling
+const JITTER = 0.5; // randomization on gain so consecutive tests differ
+
+const bigramCache = new Map<string, string[]>();
+function bigramsOf(word: string): string[] {
+  let bgs = bigramCache.get(word);
+  if (!bgs) {
+    bgs = [];
+    for (let i = 0; i < word.length - 1; i++) bgs.push(word.slice(i, i + 2));
+    bigramCache.set(word, bgs);
+  }
+  return bgs;
+}
+
+function greedyCover(
+  pool: string[],
+  targetKeys: Map<string, number>,
+  targetBgs: Map<string, number>,
+  slots: number
+): string[] {
+  const covBg = new Map<string, number>();
+  const covKey = new Map<string, number>();
+  const picked: string[] = [];
+  const pickedSet = new Set<string>();
+
+  while (picked.length < slots) {
+    let best: string | null = null;
+    let bestGain = 0;
+
+    for (const w of pool) {
+      if (pickedSet.has(w)) continue;
+      const bgs = bigramsOf(w);
+      let gain = 0;
+      for (const bg of bgs) {
+        const u = targetBgs.get(bg);
+        if (u !== undefined) gain += u * Math.pow(COVERAGE_DECAY, covBg.get(bg) ?? 0);
+      }
+      if (targetKeys.size) {
+        for (const ch of w) {
+          const u = targetKeys.get(ch);
+          if (u !== undefined) gain += u * KEY_GAIN_SHARE * Math.pow(COVERAGE_DECAY, covKey.get(ch) ?? 0);
+        }
+      }
+      if (gain <= 0) continue;
+      // efficiency: dense coverage per keystroke beats long words that pad
+      gain /= Math.sqrt(w.length);
+      // jitter keeps consecutive tests from converging on identical picks
+      gain *= 1 - JITTER / 2 + Math.random() * JITTER;
+      if (gain > bestGain) {
+        bestGain = gain;
+        best = w;
+      }
+    }
+
+    if (best === null || bestGain <= 1e-6) break; // all targets covered
+
+    picked.push(best);
+    pickedSet.add(best);
+    for (const bg of bigramsOf(best)) {
+      if (targetBgs.has(bg)) covBg.set(bg, (covBg.get(bg) ?? 0) + 1);
+    }
+    for (const ch of best) {
+      if (targetKeys.has(ch)) covKey.set(ch, (covKey.get(ch) ?? 0) + 1);
+    }
+  }
+  return picked;
+}
+
+function sampleFlow(common: string[], count: number, exclude: Set<string>): string[] {
+  const out: string[] = [];
+  const flow = shuffle(common);
+  let i = 0;
+  let guard = 0;
+  while (out.length < count && i < flow.length && guard < count * 40) {
+    const w = flow[i++];
+    guard++;
+    if (exclude.has(w)) continue;
+    if (out.length > 0 && out[out.length - 1] === w) continue;
+    out.push(w);
+    exclude.add(w);
+  }
+  // ultra-small pool fallback: allow repeats rather than come up short
+  while (out.length < count && common.length > 0) {
+    const w = pick(common);
+    if (out.length > 0 && out[out.length - 1] === w) continue;
+    out.push(w);
+  }
+  return out;
 }
 
 function interleave(words: string[], drillSet: Set<string>, intensity01: number): string[] {
@@ -166,6 +176,47 @@ function interleave(words: string[], drillSet: Set<string>, intensity01: number)
   return out;
 }
 
+/**
+ * Adaptive curation, v2: FSRS urgency ranks the targets, greedy weighted
+ * set-cover buys maximal weak-spot coverage per test, flow words keep the
+ * rhythm natural. intensity (0..100) controls the drill/flow ratio.
+ */
+function generateAdaptive(
+  learning: LearningData,
+  count: number,
+  intensity: number,
+  withPunct: boolean,
+  withNumbers: boolean
+): { words: string[]; focusKeys: string[] } {
+  const urgentKeys = keyUrgencies(learning).filter((u) => u.urgency > MIN_URGENCY).slice(0, 8);
+  const urgentBgs = bigramUrgencies(learning).filter((u) => u.urgency > MIN_URGENCY).slice(0, 14);
+  const hasSignal = learning.totalTests >= 1 && (urgentKeys.length > 0 || urgentBgs.length > 0);
+
+  const pool = getAdaptivePool();
+  const common = getCommonPool();
+  const intensity01 = Math.max(0, Math.min(1, intensity / 100));
+
+  let words: string[] = [];
+  let focusKeys: string[] = [];
+
+  if (!hasSignal) {
+    // calibration run: plain sample from the pool
+    words = sampleFlow(pool, count, new Set());
+  } else {
+    const targetKeys = new Map(urgentKeys.map((u) => [u.key, u.urgency]));
+    const targetBgs = new Map(urgentBgs.map((u) => [u.bigram, u.urgency]));
+    const targetDrill = Math.round(count * (0.25 + 0.55 * intensity01));
+    const drills = greedyCover(pool, targetKeys, targetBgs, targetDrill);
+    focusKeys = urgentKeys.slice(0, 3).map((u) => u.key);
+
+    const drillSet = new Set(drills);
+    const flow = sampleFlow(common, count - drills.length, drillSet);
+    words = interleave([...drills, ...flow], drillSet, intensity01);
+  }
+
+  return { words: withTransforms(words, withPunct, withNumbers), focusKeys };
+}
+
 function generateTime(
   duration: number,
   withPunct: boolean,
@@ -175,16 +226,9 @@ function generateTime(
   const approxWords = Math.ceil((duration * 5.5) / 1.2) + 30;
   const words: string[] = [];
   while (words.length < approxWords) {
-    words.push(pick(COMMON_WORDS));
+    words.push(pick(getCommonPool()));
   }
-  return {
-    words: words.map((w) => {
-      let out = w;
-      if (withNumbers && Math.random() < 0.08) out = maybeNumber();
-      if (withPunct) out = applyPunctuation(out);
-      return out;
-    }),
-  };
+  return { words: withTransforms(words, withPunct, withNumbers) };
 }
 
 function generateWords(
@@ -192,25 +236,19 @@ function generateWords(
   withPunct: boolean,
   withNumbers: boolean
 ): { words: string[] } {
+  const pool = getCommonPool();
   const words: string[] = [];
   for (let i = 0; i < count; i++) {
-    let w = pick(COMMON_WORDS);
+    let w = pick(pool);
     // avoid immediate repetition
-    while (words.length > 0 && words[words.length - 1] === w) w = pick(COMMON_WORDS);
+    while (words.length > 0 && words[words.length - 1] === w) w = pick(pool);
     words.push(w);
   }
-  return {
-    words: words.map((w) => {
-      let out = w;
-      if (withNumbers && Math.random() < 0.08) out = maybeNumber();
-      if (withPunct) out = applyPunctuation(out);
-      return out;
-    }),
-  };
+  return { words: withTransforms(words, withPunct, withNumbers) };
 }
 
 function generateQuote(): { words: string[]; author: string } {
-  const q = pick(QUOTES);
+  const q = pick(getQuotes());
   return { words: q.text.split(/\s+/), author: q.author };
 }
 

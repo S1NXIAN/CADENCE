@@ -1,6 +1,7 @@
 import type { LearningData, Settings, StatsData, TestResult } from "./types";
 import { DEFAULT_SETTINGS } from "./types";
 import { emptyLearning } from "./profiles";
+import { sanitizeMem } from "./memory";
 
 const KEYS = {
   settings: "cadence.settings.v1",
@@ -55,6 +56,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     caretStyle: oneOf(p.caretStyle, CARET_STYLES, DEFAULT_SETTINGS.caretStyle),
     accent: oneOf(p.accent, ACCENTS, DEFAULT_SETTINGS.accent),
     showCoach: boolOr(p.showCoach, DEFAULT_SETTINGS.showCoach),
+    onlinePacks: boolOr(p.onlinePacks, DEFAULT_SETTINGS.onlinePacks),
   };
 }
 
@@ -63,15 +65,24 @@ export function sanitizeLearning(raw: unknown): LearningData {
   if (!isPlainObject(raw)) return base;
   const p = raw as Partial<LearningData>;
 
+  // v3 adds per-item FSRS memory (mem) + lifetime error counts (errors).
+  // v2 payloads are migrated: errors seeded from attempts × errRate, memory
+  // cards seeded so practice history survives the upgrade.
   const keyProfiles: LearningData["keyProfiles"] = {};
   if (isPlainObject(p.keyProfiles)) {
     for (const [k, v] of Object.entries(p.keyProfiles)) {
       if (!isPlainObject(v)) continue;
-      keyProfiles[k] = {
-        attempts: clampNum(v.attempts, 0, 1e9, 0),
-        errRate: clampNum(v.errRate, 0, 1, 0),
+      if (!/^[a-z0-9',.;!?-]{1,2}$/i.test(k)) continue;
+      const attempts = clampNum(v.attempts, 0, 1e9, 0);
+      const errRate = clampNum(v.errRate, 0, 1, 0);
+      const lastSeen = clampNum(v.lastSeen, 0, Number.MAX_SAFE_INTEGER, 0);
+      keyProfiles[k.toLowerCase()] = {
+        attempts,
+        errors: Math.round(clampNum(v.errors, 0, 1e9, attempts * errRate)),
+        errRate,
         latency: typeof v.latency === "number" && Number.isFinite(v.latency) ? v.latency : null,
-        lastSeen: clampNum(v.lastSeen, 0, Number.MAX_SAFE_INTEGER, 0),
+        lastSeen,
+        mem: sanitizeMem(v.mem, errRate, attempts, lastSeen),
       };
     }
   }
@@ -80,11 +91,17 @@ export function sanitizeLearning(raw: unknown): LearningData {
   if (isPlainObject(p.bigramProfiles)) {
     for (const [k, v] of Object.entries(p.bigramProfiles)) {
       if (!isPlainObject(v)) continue;
-      bigramProfiles[k] = {
-        attempts: clampNum(v.attempts, 0, 1e9, 0),
-        errRate: clampNum(v.errRate, 0, 1, 0),
+      if (!/^[a-z0-9',.;!?-]{2}$/i.test(k)) continue;
+      const attempts = clampNum(v.attempts, 0, 1e9, 0);
+      const errRate = clampNum(v.errRate, 0, 1, 0);
+      const lastSeen = clampNum(v.lastSeen, 0, Number.MAX_SAFE_INTEGER, 0);
+      bigramProfiles[k.toLowerCase()] = {
+        attempts,
+        errors: Math.round(clampNum(v.errors, 0, 1e9, attempts * errRate)),
+        errRate,
         latency: typeof v.latency === "number" && Number.isFinite(v.latency) ? v.latency : null,
-        lastSeen: clampNum(v.lastSeen, 0, Number.MAX_SAFE_INTEGER, 0),
+        lastSeen,
+        mem: sanitizeMem(v.mem, errRate, attempts, lastSeen),
       };
     }
   }
@@ -111,7 +128,7 @@ export function sanitizeLearning(raw: unknown): LearningData {
     totalChars: clampNum(p.totalChars, 0, Number.MAX_SAFE_INTEGER, 0),
     totalTests: Math.round(clampNum(p.totalTests, 0, 1e6, 0)),
     totalTimeMs: clampNum(p.totalTimeMs, 0, Number.MAX_SAFE_INTEGER, 0),
-    lastVersion: 2,
+    lastVersion: 3,
   };
 }
 

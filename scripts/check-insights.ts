@@ -1,7 +1,15 @@
 import { generateInsights, nextTestPreview } from "../src/lib/typing/insights";
 import { emptyLearning } from "../src/lib/typing/profiles";
+import { newMemCard, reviewMem } from "../src/lib/typing/memory";
 import type { LearningData, Settings, StatsData, TestResult } from "../src/lib/typing/types";
 import { DEFAULT_SETTINGS } from "../src/lib/typing/types";
+
+function profile(attempts: number, errRate: number, latency: number) {
+  const mem0 = newMemCard();
+  let mem = mem0;
+  for (let i = 0; i < 3; i++) mem = reviewMem(mem, errRate > 0.05 ? "again" : "good");
+  return { attempts, errors: Math.round(attempts * errRate), errRate, latency, lastSeen: Date.now(), mem };
+}
 
 // simulate: 3 errors on 'e' right after 'th' + one on 'o' after 'w'
 const learning: LearningData = emptyLearning();
@@ -10,9 +18,9 @@ learning.errorContexts.push(
   { trigram: "the", count: 3, lastSeen: Date.now() },
   { trigram: "wo", count: 2, lastSeen: Date.now() }
 );
-learning.keyProfiles["e"] = { attempts: 40, errRate: 0.09, latency: 220, lastSeen: Date.now() };
-learning.keyProfiles["t"] = { attempts: 60, errRate: 0.01, latency: 150, lastSeen: Date.now() };
-learning.bigramProfiles["th"] = { attempts: 30, errRate: 0.05, latency: 260, lastSeen: Date.now() };
+learning.keyProfiles["e"] = profile(40, 0.09, 220);
+learning.keyProfiles["t"] = profile(60, 0.01, 150);
+learning.bigramProfiles["th"] = profile(30, 0.05, 260);
 
 const result: TestResult = {
   id: "t1", timestamp: Date.now(), mode: "adaptive", modeLabel: "adaptive 25",

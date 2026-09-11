@@ -71,6 +71,12 @@ export function SettingsModal({ open, onOpenChange, settings, update }: Settings
               onChange={(v) => update({ numbers: v })}
             />
             <ToggleRow
+              label="online word packs"
+              hint="when online: pull a 10k frequency word list + extra quotes, cache them locally for offline use — the core stays fully offline"
+              checked={settings.onlinePacks}
+              onChange={(v) => update({ onlinePacks: v })}
+            />
+            <ToggleRow
               label="live wpm"
               hint="show speed while typing"
               checked={settings.liveWpm}

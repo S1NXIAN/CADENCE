@@ -13,6 +13,27 @@ export interface Settings {
   caretStyle: "line" | "block" | "underline";
   accent: "lime" | "amber" | "cyan" | "rose";
   showCoach: boolean;
+  onlinePacks: boolean; // when online: fetch + cache extra word/quote packs (full-potential layer)
+}
+
+/**
+ * FSRS memory state for one tracked item (a key or a key transition).
+ * Serializable subset of a ts-fsrs card — dates stored as epoch ms so the
+ * persistence format never depends on Date JSON quirks.
+ *   stability   — days until retrievability decays to 90% (S in FSRS)
+ *   difficulty  — 1..10, how error-prone this item is for this typist (D in FSRS)
+ *   reps/lapses — lifetime review and forgetting counts (confidence measure)
+ *   state       — ts-fsrs State enum value (0 New, 1 Learning, 2 Review, 3 Relearning)
+ */
+export interface MemCard {
+  s: number;
+  d: number;
+  reps: number;
+  lapses: number;
+  state: number;
+  ls: number; // (re)learning step index — must persist or cards never graduate to Review
+  last: number | null; // last review epoch ms
+  due: number; // next scheduled review epoch ms
 }
 
 export interface CharEvent {
@@ -46,17 +67,21 @@ export interface TestResult {
 }
 
 export interface KeyProfile {
-  attempts: number; // decayed exposure count
-  errRate: number; // EWMA 0..1
+  attempts: number; // cumulative exposures (lifetime)
+  errors: number; // cumulative errors on this key (lifetime, feeds prior shrinkage)
+  errRate: number; // EWMA 0..1 (recency-weighted)
   latency: number | null; // EWMA ms between keystrokes for this key
   lastSeen: number; // timestamp
+  mem: MemCard | null; // FSRS memory state (null = never reviewed)
 }
 
 export interface BigramProfile {
   attempts: number;
+  errors: number;
   errRate: number;
   latency: number | null;
   lastSeen: number;
+  mem: MemCard | null;
 }
 
 // confusion pair: expected -> typed
@@ -135,4 +160,5 @@ export const DEFAULT_SETTINGS: Settings = {
   caretStyle: "line",
   accent: "lime",
   showCoach: true,
+  onlinePacks: true,
 };

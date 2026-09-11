@@ -1,3 +1,4 @@
+import { State } from "ts-fsrs";
 import type {
   BigramProfile,
   CharEvent,
@@ -5,17 +6,27 @@ import type {
   ErrorContext,
   KeyProfile,
   LearningData,
+  MemCard,
   WeakKey,
 } from "./types";
+import { newMemCard, reviewMem, memRetrievability, type GradeName } from "./memory";
+import { keyPrior, classifyBigram, PRIOR_BASE_ERR, PRIOR_BASE_LAT } from "./motor";
 
-// EWMA alphas — how fast the model adapts to recent behavior.
+// EWMA alphas — how fast the *displayed* recency stats adapt. The actual
+// scheduling lives in the FSRS memory model (memory.ts); EWMA error/latency
+// remain as fast-reacting signals on top of it.
 const ERR_ALPHA = 0.08; // error rate adapts moderately fast
 const LATENCY_ALPHA = 0.06; // latency adapts smoothly
-const EXPOSURE_DECAY = 0.985; // old exposure fades so stale keys drop out of focus
-const MIN_ATTEMPTS = 4; // below this, a key isn't confident enough to be called weak
 const MAX_LATENCY_SAMPLE = 2000; // ignore pauses longer than 2s (thinking, not typing)
 const MAX_CONFUSIONS = 60;
 const MAX_ERROR_CONTEXTS = 40;
+
+// Bayesian shrinkage strengths: observed data needs this many effective
+// samples to fully override the motor priors (motor.ts).
+const PRIOR_K_ERR = 4;
+const PRIOR_K_LAT = 6;
+// The recent-error EWMA signal only earns trust with this many attempts.
+const EWMA_CONF_ATTEMPTS = 8;
 
 export function emptyLearning(): LearningData {
   return {
@@ -27,7 +38,7 @@ export function emptyLearning(): LearningData {
     totalChars: 0,
     totalTests: 0,
     totalTimeMs: 0,
-    lastVersion: 2,
+    lastVersion: 3,
   };
 }
 
@@ -37,7 +48,7 @@ function isTrackedKey(ch: string): boolean {
 
 function ensureKey(profiles: Record<string, KeyProfile>, key: string): KeyProfile {
   if (!profiles[key]) {
-    profiles[key] = { attempts: 0, errRate: 0, latency: null, lastSeen: 0 };
+    profiles[key] = { attempts: 0, errors: 0, errRate: 0, latency: null, lastSeen: 0, mem: null };
   }
   return profiles[key];
 }
@@ -47,58 +58,93 @@ function ensureBigram(
   bigram: string
 ): BigramProfile {
   if (!profiles[bigram]) {
-    profiles[bigram] = { attempts: 0, errRate: 0, latency: null, lastSeen: 0 };
+    profiles[bigram] = { attempts: 0, errors: 0, errRate: 0, latency: null, lastSeen: 0, mem: null };
   }
   return profiles[bigram];
+}
+
+// ---------------------------------------------------------------------------
+// Per-test review batching: keystroke-level ingest stays incremental, but the
+// FSRS review happens ONCE per item per test, from the aggregated tally.
+// ---------------------------------------------------------------------------
+export interface Tally {
+  n: number; // keystrokes aimed at this item this test
+  err: number; // of which wrong
+  latSum: number;
+  latN: number;
+}
+
+export interface ReviewTally {
+  keys: Map<string, Tally>;
+  bigrams: Map<string, Tally>;
+}
+
+export function newReviewTally(): ReviewTally {
+  return { keys: new Map(), bigrams: new Map() };
+}
+
+function bumpTally(map: Map<string, Tally>, id: string, err: number, lat: number | null): void {
+  let t = map.get(id);
+  if (!t) {
+    t = { n: 0, err: 0, latSum: 0, latN: 0 };
+    map.set(id, t);
+  }
+  t.n += 1;
+  t.err += err;
+  if (lat !== null) {
+    t.latSum += lat;
+    t.latN += 1;
+  }
 }
 
 /**
  * Ingest all character events from a finished test into the learning data.
  * - correct keystrokes update motor latency (EWMA) for the pressed key
- *   and for the bigram transition (prev -> current).
+ *   and for the bigram transition (prev -> current), and count toward the
+ *   per-test FSRS review tally.
  * - errors update the error rate of the EXPECTED key, the transition bigram
- *   (prev -> expected — the key COMBINATION that failed), and record a
- *   confusion pair (expected -> typed) plus a trigram error context
- *   (the 2 keys typed before the mistake).
- * - exposure decays so the model always reflects recent typing habits.
+ *   (prev -> expected — the key COMBINATION that failed), record a confusion
+ *   pair (expected -> typed) plus a trigram error context, and count as
+ *   failures in the tally for both the expected and the typed key.
+ * Returns the tally that finalizeLearning consumes for FSRS scheduling.
  */
-export function ingestEvents(learning: LearningData, events: CharEvent[], durationMs: number): void {
+export function ingestEvents(learning: LearningData, events: CharEvent[], durationMs: number): ReviewTally {
+  const tally = newReviewTally();
   let prevTyped: string | null = null;
   let prevTime: number | null = null;
   const lastPressed: string[] = []; // last 2 tracked pressed chars, for error context
 
   for (const ev of events) {
     learning.totalKeystrokes += 1;
+    const delta = ev.correct && prevTime !== null && ev.t - prevTime > 20 && ev.t - prevTime < MAX_LATENCY_SAMPLE
+      ? ev.t - prevTime
+      : null;
 
-    // decay everything a little each keystroke batch (cheap and effective)
-    // exposure decay is applied per keystroke at a tiny rate
-    // (EXPOSURE_DECAY^keystroke would be too strong; we apply it in finalizeLearning)
     if (isTrackedKey(ev.typed)) {
       const kp = ensureKey(learning.keyProfiles, ev.typed.toLowerCase());
       kp.attempts += 1;
       kp.lastSeen = Date.now();
 
-      if (ev.correct && prevTime !== null) {
-        const delta = ev.t - prevTime;
-        if (delta > 20 && delta < MAX_LATENCY_SAMPLE) {
-          kp.latency =
-            kp.latency === null
-              ? delta
-              : kp.latency * (1 - LATENCY_ALPHA) + delta * LATENCY_ALPHA;
+      if (ev.correct) {
+        if (delta !== null) {
+          kp.latency = kp.latency === null ? delta : kp.latency * (1 - LATENCY_ALPHA) + delta * LATENCY_ALPHA;
         }
-      }
-      if (!ev.correct) {
-        kp.errRate = kp.errRate * (1 - ERR_ALPHA) + 1 * ERR_ALPHA;
+        bumpTally(tally.keys, ev.typed.toLowerCase(), 0, delta);
       } else {
-        kp.errRate = kp.errRate * (1 - ERR_ALPHA) + 0 * ERR_ALPHA;
+        kp.errors += 1;
+        kp.errRate = kp.errRate * (1 - ERR_ALPHA) + 1 * ERR_ALPHA;
+        bumpTally(tally.keys, ev.typed.toLowerCase(), 1, null);
       }
     }
 
     // error attribution: the key you WERE SUPPOSED to press gets the blame
     if (ev.expected && !ev.correct && isTrackedKey(ev.expected)) {
-      const kp = ensureKey(learning.keyProfiles, ev.expected.toLowerCase());
+      const exp = ev.expected.toLowerCase();
+      const kp = ensureKey(learning.keyProfiles, exp);
+      kp.errors += 1;
       kp.errRate = kp.errRate * (1 - ERR_ALPHA) + 1 * ERR_ALPHA;
       kp.lastSeen = Date.now();
+      bumpTally(tally.keys, exp, 1, null);
     }
 
     // bigram transition: prev -> (typed when correct, expected when not).
@@ -115,16 +161,16 @@ export function ingestEvents(learning: LearningData, events: CharEvent[], durati
       const bp = ensureBigram(learning.bigramProfiles, bg);
       bp.attempts += 1;
       bp.lastSeen = Date.now();
-      if (ev.correct && prevTime !== null) {
-        const delta = ev.t - prevTime;
-        if (delta > 20 && delta < MAX_LATENCY_SAMPLE) {
-          bp.latency =
-            bp.latency === null
-              ? delta
-              : bp.latency * (1 - LATENCY_ALPHA) + delta * LATENCY_ALPHA;
+      if (ev.correct) {
+        if (delta !== null) {
+          bp.latency = bp.latency === null ? delta : bp.latency * (1 - LATENCY_ALPHA) + delta * LATENCY_ALPHA;
         }
+        bumpTally(tally.bigrams, bg, 0, delta);
+      } else {
+        bp.errors += 1;
+        bp.errRate = bp.errRate * (1 - ERR_ALPHA) + 1 * ERR_ALPHA;
+        bumpTally(tally.bigrams, bg, 1, null);
       }
-      bp.errRate = bp.errRate * (1 - ERR_ALPHA) + (ev.correct ? 0 : 1) * ERR_ALPHA;
     }
 
     // confusion pair expected -> typed
@@ -179,57 +225,126 @@ export function ingestEvents(learning: LearningData, events: CharEvent[], durati
 
   learning.totalChars += events.filter((e) => e.correct).length;
   learning.totalTimeMs += durationMs;
+  return tally;
+}
+
+/** Median observed inter-key latency across all tracked items (0 if none). */
+function personalMedianLatency(learning: LearningData): number {
+  const latencies: number[] = [];
+  for (const p of Object.values(learning.keyProfiles)) {
+    if (p.latency !== null) latencies.push(p.latency);
+  }
+  for (const p of Object.values(learning.bigramProfiles)) {
+    if (p.latency !== null) latencies.push(p.latency);
+  }
+  if (!latencies.length) return 0;
+  latencies.sort((a, b) => a - b);
+  return latencies[Math.floor(latencies.length / 2)];
 }
 
 /**
- * Called once after each test: decay all exposures so stale data fades.
+ * Map one item's aggregated test performance to an FSRS grade.
+ * Accuracy dominates; clean-but-slow runs grade Hard; fast-and-clean grades
+ * Easy once the item has history (first review is capped at Good so a lucky
+ * 2-keystroke sample can't rocket an item to long-term stability).
  */
-export function finalizeLearning(learning: LearningData): void {
-  const decay = (obj: Record<string, { attempts: number }>) => {
-    for (const k of Object.keys(obj)) {
-      obj[k].attempts *= EXPOSURE_DECAY;
+function gradeTally(t: Tally, avgLatRatio: number | null, hasHistory: boolean): GradeName {
+  const acc = t.n > 0 ? 1 - t.err / t.n : 1;
+  if (acc < 0.8) return "again";
+  if (acc < 0.97 || t.err >= 2) return "hard";
+  if (avgLatRatio !== null && avgLatRatio > 1.3) return "hard";
+  if (hasHistory && avgLatRatio !== null && avgLatRatio < 0.72) return "easy";
+  return "good";
+}
+
+/**
+ * Called once after each test: apply FSRS reviews from the tally (one review
+ * per item per test) and bump the test counter.
+ */
+export function finalizeLearning(learning: LearningData, tally?: ReviewTally): void {
+  if (tally) {
+    const now = Date.now();
+    const median = personalMedianLatency(learning);
+
+    for (const [ch, t] of tally.keys) {
+      const kp = ensureKey(learning.keyProfiles, ch);
+      const effLat = effLatency(kp.latency, kp.attempts, keyPrior(ch).lat);
+      const ratio = t.latN > 0 && effLat > 0 && median > 0 ? (t.latSum / t.latN) / median : null;
+      const grade = gradeTally(t, ratio, (kp.mem?.reps ?? 0) > 0);
+      kp.mem = reviewMem(kp.mem ?? newMemCard(now), grade, now);
     }
-  };
-  decay(learning.keyProfiles as unknown as Record<string, { attempts: number }>);
-  decay(learning.bigramProfiles as unknown as Record<string, { attempts: number }>);
+
+    for (const [bg, t] of tally.bigrams) {
+      const bp = ensureBigram(learning.bigramProfiles, bg);
+      const prior = classifyBigram(bg[0], bg[1]).lat;
+      const effLat = effLatency(bp.latency, bp.attempts, prior);
+      const ratio = t.latN > 0 && effLat > 0 && median > 0 ? (t.latSum / t.latN) / median : null;
+      const grade = gradeTally(t, ratio, (bp.mem?.reps ?? 0) > 0);
+      bp.mem = reviewMem(bp.mem ?? newMemCard(now), grade, now);
+    }
+  }
   learning.totalTests += 1;
 }
 
-/**
- * Weakness score per key:
- *   weakness = confidence * (errRate * 1.4 + max(0, latencyPenalty) * 0.9)
- * Keys with very few attempts are not confident → dampened.
- */
-export function computeWeakKeys(
-  learning: LearningData,
-  pool: string[] = Object.keys(learning.keyProfiles)
-): WeakKey[] {
-  const latencies: number[] = [];
-  for (const k of pool) {
-    const p = learning.keyProfiles[k];
-    if (p && p.latency !== null) latencies.push(p.latency);
-  }
-  latencies.sort((a, b) => a - b);
-  const median = latencies.length ? latencies[Math.floor(latencies.length / 2)] : 180;
+/** Latency shrunk toward the motor prior (cold start -> prior itself). */
+function effLatency(ewma: number | null, attempts: number, priorLat: number): number {
+  if (ewma === null) return priorLat;
+  return (attempts * ewma + PRIOR_K_LAT * priorLat) / (attempts + PRIOR_K_LAT);
+}
 
-  const weak: WeakKey[] = [];
-  for (const key of pool) {
-    const p = learning.keyProfiles[key];
-    if (!p) continue;
-    const confidence = Math.min(1, p.attempts / (MIN_ATTEMPTS * 3));
-    const latencyPenalty = p.latency !== null ? Math.max(0, (p.latency - median) / median) : 0;
-    const weakness = confidence * (p.errRate * 1.4 + latencyPenalty * 0.9);
-    if (p.attempts >= MIN_ATTEMPTS) {
-      weak.push({
-        key,
-        weakness,
-        errRate: p.errRate,
-        latency: p.latency,
-        attempts: p.attempts,
-      });
+// ---------------------------------------------------------------------------
+// Urgency — the unified "how much does this item need practice right now"
+// score that replaced the old weakness heuristic. Signals:
+//   (1-R)   FSRS retrievability decay (the spaced-repetition heartbeat)
+//   chronic errors   shrunk lifetime error rate vs motor prior
+//   recent errors    EWMA error rate, confidence-gated
+//   slow latency     shrunk latency vs personal median
+//   difficulty       FSRS D keeps stubborn items warm
+// ---------------------------------------------------------------------------
+export interface UrgentKey {
+  key: string;
+  urgency: number;
+  retrievability: number;
+  errRate: number;
+  latency: number | null;
+  attempts: number;
+}
+
+function shrunkErrRate(errors: number, attempts: number, priorErr: number): number {
+  return (errors + PRIOR_K_ERR * priorErr) / (attempts + PRIOR_K_ERR);
+}
+
+export function keyUrgencies(learning: LearningData): UrgentKey[] {
+  const now = Date.now();
+  const median = personalMedianLatency(learning) || PRIOR_BASE_LAT + 15;
+  const out: UrgentKey[] = [];
+
+  for (const [key, p] of Object.entries(learning.keyProfiles)) {
+    const prior = keyPrior(key);
+    const mem: MemCard | null = p.mem;
+    const R = mem ? memRetrievability(mem, now) : 0;
+    const chronic = Math.max(0, shrunkErrRate(p.errors, p.attempts, prior.err) / PRIOR_BASE_ERR - 1.15);
+    const ewmaConf = Math.min(1, p.attempts / EWMA_CONF_ATTEMPTS);
+    const recent = Math.max(0, p.errRate * ewmaConf - PRIOR_BASE_ERR * 1.35);
+    const effLat = effLatency(p.latency, p.attempts, prior.lat);
+    const slow = Math.max(0, effLat / median - 1);
+
+    let urgency: number;
+    if (mem && mem.reps > 0) {
+      urgency =
+        (1 - R) * 1.35 +
+        chronic * 0.6 * prior.freqW +
+        recent * 1.15 * prior.freqW +
+        Math.max(0, slow - 0.12) * 0.55 * prior.freqW +
+        (mem.d / 10) * 0.1;
+    } else {
+      // cold start (no review history): motor priors point at pinky/bottom-row keys
+      urgency = Math.max(0, prior.err / PRIOR_BASE_ERR - 1) * 0.22;
     }
+
+    out.push({ key, urgency, retrievability: R, errRate: p.errRate, latency: p.latency, attempts: p.attempts });
   }
-  return weak.sort((a, b) => b.weakness - a.weakness);
+  return out.sort((a, b) => b.urgency - a.urgency);
 }
 
 export interface WeakBigram {
@@ -240,33 +355,81 @@ export interface WeakBigram {
   attempts: number;
 }
 
+export interface UrgentBigram {
+  bigram: string;
+  urgency: number;
+  retrievability: number;
+}
+
+export function bigramUrgencies(learning: LearningData): UrgentBigram[] {
+  const now = Date.now();
+  const median = personalMedianLatency(learning) || PRIOR_BASE_LAT + 15;
+  const out: UrgentBigram[] = [];
+
+  for (const [bg, p] of Object.entries(learning.bigramProfiles)) {
+    if (!bg || bg.length < 2) continue;
+    const prior = classifyBigram(bg[0], bg[1]);
+    const mem: MemCard | null = p.mem;
+    const R = mem ? memRetrievability(mem, now) : 0;
+    const chronic = Math.max(0, shrunkErrRate(p.errors, p.attempts, prior.err) / PRIOR_BASE_ERR - 1.15);
+    const ewmaConf = Math.min(1, p.attempts / EWMA_CONF_ATTEMPTS);
+    const recent = Math.max(0, p.errRate * ewmaConf - PRIOR_BASE_ERR * 1.35);
+    const effLat = effLatency(p.latency, p.attempts, prior.lat);
+    const slow = Math.max(0, effLat / median - 1);
+
+    let urgency: number;
+    if (mem && mem.reps > 0) {
+      urgency =
+        (1 - R) * 1.35 +
+        chronic * 0.75 +
+        recent * 1.2 +
+        Math.max(0, slow - 0.12) * 0.6 +
+        (mem.d / 10) * 0.1;
+    } else {
+      urgency = Math.max(0, prior.err / PRIOR_BASE_ERR - 1) * 0.22;
+    }
+    out.push({ bigram: bg, urgency, retrievability: R });
+  }
+  return out.sort((a, b) => b.urgency - a.urgency);
+}
+
 /**
- * Weak bigram transitions: combinations that either produce errors or slow you
- * down relative to your median transition speed. This is how the coach knows
- * WHICH key combinations (not just keys) need work.
+ * Weak keys ranked by urgency. Interface-compatible with the old heuristic;
+ * `weakness` is now the FSRS+prior urgency score.
+ */
+export function computeWeakKeys(
+  learning: LearningData,
+  pool: string[] = Object.keys(learning.keyProfiles)
+): WeakKey[] {
+  const poolSet = new Set(pool);
+  return keyUrgencies(learning)
+    .filter((u) => poolSet.has(u.key))
+    .map((u) => ({
+      key: u.key,
+      weakness: u.urgency,
+      errRate: u.errRate,
+      latency: u.latency,
+      attempts: u.attempts,
+    }));
+}
+
+/**
+ * Weak bigram transitions, ranked by urgency (FSRS decay + prior-shrunk
+ * errors/latency). This is how the coach knows WHICH key combinations need work.
  */
 export function weakBigrams(learning: LearningData, topN = 8): WeakBigram[] {
-  const latencies: number[] = [];
-  for (const p of Object.values(learning.bigramProfiles)) {
-    if (p.latency !== null) latencies.push(p.latency);
-  }
-  latencies.sort((a, b) => a - b);
-  const median = latencies.length ? latencies[Math.floor(latencies.length / 2)] : 180;
-
-  const out: WeakBigram[] = [];
-  for (const [bg, p] of Object.entries(learning.bigramProfiles)) {
-    if (p.attempts < MIN_ATTEMPTS) continue;
-    const confidence = Math.min(1, p.attempts / (MIN_ATTEMPTS * 3));
-    const latencyPenalty = p.latency !== null ? Math.max(0, (p.latency - median) / median) : 0;
-    out.push({
-      bigram: bg,
-      weakness: confidence * (p.errRate * 1.6 + latencyPenalty * 0.8),
-      errRate: p.errRate,
-      latency: p.latency,
-      attempts: p.attempts,
+  return bigramUrgencies(learning)
+    .slice(0, topN)
+    .map((u) => {
+      const p = learning.bigramProfiles[u.bigram];
+      return {
+        bigram: u.bigram,
+        weakness: u.urgency,
+        errRate: p?.errRate ?? 0,
+        latency: p?.latency ?? null,
+        attempts: p?.attempts ?? 0,
+      };
     });
-  }
-  return out.sort((a, b) => b.weakness - a.weakness).slice(0, topN);
 }
 
 /** Trigram contexts where errors cluster: the 2 keys before a mistake + the fumbled key. */
@@ -283,3 +446,6 @@ export function topConfusions(learning: LearningData, topN = 5): ConfusionPair[]
     .sort((a, b) => b.count - a.count)
     .slice(0, topN);
 }
+
+// kept for consumers that import State through profiles (no-op re-export guard)
+export const MEMORY_STATE_NEW = State.New;
