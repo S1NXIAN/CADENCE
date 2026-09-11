@@ -11,6 +11,7 @@ const KEYS = {
 };
 
 const MAX_HISTORY = 500;
+const MAX_ACTIVITY_DAYS = 400; // heatmap ledger window (longer than a 53-week grid)
 
 // ---------------------------------------------------------------------------
 // Sanitizers — anything read back from localStorage or an imported backup is
@@ -229,9 +230,32 @@ export function sanitizeStats(raw: unknown): StatsData {
     }
   }
 
+  // Activity ledger: only "yyyy-mm-dd" keys, every number clamped (a
+  // hand-edited timeS of 1e300 would break the heatmap's color scale),
+  // capped to the most recent MAX_ACTIVITY_DAYS days.
+  const dailyActivity: StatsData["dailyActivity"] = {};
+  if (isPlainObject(p.dailyActivity)) {
+    for (const [k, v] of Object.entries(p.dailyActivity)) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(k) || !isPlainObject(v)) continue;
+      dailyActivity[k] = {
+        tests: Math.round(clampNum(v.tests, 0, 5000, 0)),
+        timeS: Math.round(clampNum(v.timeS, 0, 86400, 0)),
+        bestWpm:
+          typeof v.bestWpm === "number" && Number.isFinite(v.bestWpm)
+            ? clampNum(v.bestWpm, 0, 500, 0)
+            : null,
+      };
+    }
+    const dayKeys = Object.keys(dailyActivity).sort();
+    for (const k of dayKeys.slice(0, Math.max(0, dayKeys.length - MAX_ACTIVITY_DAYS))) {
+      delete dailyActivity[k];
+    }
+  }
+
   return {
     history,
     personalBests,
+    dailyActivity,
     streakDays: Math.round(clampNum(p.streakDays, 0, 36500, 0)),
     lastTestDay: typeof p.lastTestDay === "string" ? p.lastTestDay : base.lastTestDay,
     firstTestDay: typeof p.firstTestDay === "string" ? p.firstTestDay : null,
@@ -306,6 +330,7 @@ export function emptyStats(): StatsData {
   return {
     history: [],
     personalBests: {},
+    dailyActivity: {},
     streakDays: 0,
     lastTestDay: "",
     firstTestDay: null,
@@ -326,11 +351,20 @@ export function saveStats(stats: StatsData): void {
   safeSet(KEYS.stats, JSON.stringify(stats));
 }
 
-function todayKey(d = new Date()): string {
+/**
+ * Local-timezone calendar day for a timestamp, "yyyy-mm-dd" — the same key
+ * format as todayKey()/lastTestDay (never UTC: a 23:40 test must land on
+ * the day the user experienced, not the next UTC day).
+ */
+export function isoDayLocal(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function todayKey(d = new Date()): string {
+  return isoDayLocal(d);
 }
 
 function daysBetween(a: string, b: string): number {
@@ -364,9 +398,28 @@ export function recordResult(stats: StatsData, result: TestResult): StatsData {
   }
 
   const history = [stamped, ...stats.history].slice(0, MAX_HISTORY);
+
+  // Bump the day ledger for the heatmap (source of truth once history
+  // scrolls past MAX_HISTORY) and prune days that left the window.
+  const dailyActivity: StatsData["dailyActivity"] = { ...stats.dailyActivity };
+  const t = dailyActivity[today] ?? { tests: 0, timeS: 0, bestWpm: null };
+  dailyActivity[today] = {
+    tests: Math.min(5000, t.tests + 1),
+    timeS: Math.min(86400, Math.round(t.timeS + Math.max(0, result.duration))),
+    bestWpm:
+      t.bestWpm === null
+        ? Math.max(0, Math.min(500, result.wpm))
+        : Math.max(t.bestWpm, Math.min(500, result.wpm)),
+  };
+  const cutoff = isoDayLocal(new Date(Date.now() - MAX_ACTIVITY_DAYS * 86400000));
+  for (const k of Object.keys(dailyActivity)) {
+    if (k < cutoff) delete dailyActivity[k];
+  }
+
   return {
     history,
     personalBests,
+    dailyActivity,
     streakDays,
     lastTestDay: today,
     firstTestDay: stats.firstTestDay ?? today,

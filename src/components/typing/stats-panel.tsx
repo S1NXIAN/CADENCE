@@ -5,6 +5,7 @@ import type { LearningData, StatsData } from "@/lib/typing/types";
 import { computeWeakKeys, topConfusions, weakBigrams } from "@/lib/typing/profiles";
 import { KeyHeatmap } from "./key-heatmap";
 import { HistoryChart } from "./history-chart";
+import { ActivityHeatmap } from "./activity-heatmap";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { X, Download, Upload, Trash2, Keyboard, Flame, Clock, Gauge, Target } from "lucide-react";
 
@@ -81,6 +82,10 @@ export function StatsPanel({
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
+            <div>
+              <SectionTitle>activity — last 53 weeks</SectionTitle>
+              <ActivityHeatmap stats={stats} />
+            </div>
             <div>
               <SectionTitle>wpm progression</SectionTitle>
               <HistoryChart history={stats.history} />

@@ -119,9 +119,22 @@ export interface PersonalBest {
   timestamp: number;
 }
 
+/**
+ * One day's practice volume for the activity heatmap. Kept as a compact
+ * ledger (date string -> DayActivity) because stats.history is capped at
+ * MAX_HISTORY=500 entries — heavy users would see older days silently go
+ * dark on a history-derived heatmap. ~90 bytes/day, pruned to 400 days.
+ */
+export interface DayActivity {
+  tests: number;
+  timeS: number; // seconds actually spent typing that day
+  bestWpm: number | null; // best wpm recorded that day
+}
+
 export interface StatsData {
   history: TestResult[];
   personalBests: Record<string, PersonalBest>; // key: modeLabel
+  dailyActivity: Record<string, DayActivity>; // "yyyy-mm-dd" (local) -> volume
   streakDays: number;
   lastTestDay: string; // yyyy-mm-dd
   firstTestDay: string | null;

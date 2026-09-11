@@ -94,7 +94,7 @@ function baseResult(partial: Partial<TestResult>): TestResult {
 }
 
 function baseStats(history: TestResult[] = []): StatsData {
-  return { history, personalBests: {}, streakDays: 3, lastTestDay: "", firstTestDay: null };
+  return { history, personalBests: {}, dailyActivity: {}, streakDays: 3, lastTestDay: "", firstTestDay: null };
 }
 
 function show(name: string, notes: ReturnType<typeof generateInsights>) {
