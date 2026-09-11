@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CharEvent, SecondSample, Settings, TestResult } from "@/lib/typing/types";
+import type { CharEvent, SecondSample, Settings, TestResult, WordOutcome } from "@/lib/typing/types";
 import type { GeneratedTest } from "@/lib/typing/generator";
 
 export type SessionStatus = "idle" | "running" | "done";
@@ -30,11 +30,19 @@ interface UseTypingSessionOpts {
   settings: Settings;
   /**
    * called with the final result, the full keystroke event log, the target
-   * word list, and the final committed attempt per word — the raw material
-   * for the results-screen audit (word diffs can't be reconstructed from the
-   * event log alone because backspaces are invisible in it).
+   * word list, the final committed attempt per word, and per-word outcomes
+   * (timing + wrong-keystroke count of each final attempt — the raw material
+   * for the results-screen audit and the word-level memory scheduler; word
+   * diffs can't be reconstructed from the event log alone because backspaces
+   * are invisible in it).
    */
-  onFinish: (result: TestResult, events: CharEvent[], targets: string[], typed: string[]) => void;
+  onFinish: (
+    result: TestResult,
+    events: CharEvent[],
+    targets: string[],
+    typed: string[],
+    wordOutcomes: WordOutcome[]
+  ) => void;
   /** called on each accepted keystroke (for sound feedback) */
   onKeystroke?: (correct: boolean) => void;
 }
@@ -65,6 +73,13 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
   const errorsThisSecondRef = useRef(0);
   const lastKeystrokeAtRef = useRef<number | null>(null);
   const charStatsRef = useRef({ correct: 0, incorrect: 0, extra: 0, missed: 0 });
+  // per-word attempt tracking (word memory scheduler): start time of the
+  // CURRENT attempt (null until its first keystroke), wrong keystrokes in the
+  // current attempt (incl. later-corrected ones), committed outcomes — kept
+  // index-aligned with typedWordsRef so pull-backs pop in lockstep
+  const wordOutcomesRef = useRef<WordOutcome[]>([]);
+  const wordStartRef = useRef<number | null>(null);
+  const wordErrRef = useRef(0);
 
   const words = test.words;
 
@@ -81,6 +96,9 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
     errorsThisSecondRef.current = 0;
     lastKeystrokeAtRef.current = null;
     charStatsRef.current = { correct: 0, incorrect: 0, extra: 0, missed: 0 };
+    wordOutcomesRef.current = [];
+    wordStartRef.current = null;
+    wordErrRef.current = 0;
     setTypedWords([]);
     setInput("");
     setStatus("idle");
@@ -135,8 +153,22 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
 
     // commit the in-progress word (time mode / auto-finish)
     if (inputRef.current.length > 0 && typedWordsRef.current.length < test.words.length) {
+      const idx = typedWordsRef.current.length;
+      const target = test.words[idx] ?? "";
+      const nowT = startedAtRef.current ? performance.now() - startedAtRef.current : 0;
+      wordOutcomesRef.current.push({
+        target,
+        typed: inputRef.current,
+        ms: wordStartRef.current !== null ? Math.max(0, nowT - wordStartRef.current) : null,
+        errKeys: wordErrRef.current,
+        // exact-match auto-finish is a complete word; a timer cutoff (or a
+        // strict-mode length finish with junk) is truncated — not a review
+        partial: inputRef.current !== target,
+      });
       typedWordsRef.current = [...typedWordsRef.current, inputRef.current];
       inputRef.current = "";
+      wordStartRef.current = null;
+      wordErrRef.current = 0;
     }
 
     const startedAt = startedAtRef.current ?? performance.now();
@@ -197,7 +229,13 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
     setResult(res);
     setStatus("done");
     statusRef.current = "done";
-    optsRef.current.onFinish(res, events.map((e) => ({ ...e })), test.words, finalTyped);
+    optsRef.current.onFinish(
+      res,
+      events.map((e) => ({ ...e })),
+      test.words,
+      finalTyped,
+      wordOutcomesRef.current.map((o) => ({ ...o }))
+    );
   }, [test]);
 
   // ---- ticking -----------------------------------------------------------
@@ -258,7 +296,11 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
       startIfIdle();
       const t = startedAtRef.current ? performance.now() - startedAtRef.current : 0;
       eventsRef.current.push({ t, expected, typed: ch, correct });
-      if (!correct) errorsThisSecondRef.current += 1;
+      if (wordStartRef.current === null) wordStartRef.current = t; // first keystroke of this attempt
+      if (!correct) {
+        errorsThisSecondRef.current += 1;
+        wordErrRef.current += 1;
+      }
       optsRef.current.onKeystroke?.(correct);
 
       inputRef.current = inputRef.current + ch;
@@ -290,6 +332,17 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
     const target = test.words[idx] ?? "";
     const typed = inputRef.current;
     const nowT = startedAtRef.current ? performance.now() - startedAtRef.current : 0;
+
+    // word attempt outcome for the memory scheduler: final attempt duration
+    // (first keystroke -> space) + wrong keystrokes, incl. later-corrected ones
+    wordOutcomesRef.current.push({
+      target,
+      typed,
+      ms: wordStartRef.current !== null ? Math.max(0, nowT - wordStartRef.current) : null,
+      errKeys: wordErrRef.current,
+    });
+    wordStartRef.current = null;
+    wordErrRef.current = 0;
 
     // record missed chars as silent error events for the learning engine
     if (typed.length < target.length) {
@@ -326,7 +379,11 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
           // pull back previous word
           const prev = typedWordsRef.current[typedWordsRef.current.length - 1] ?? "";
           typedWordsRef.current = typedWordsRef.current.slice(0, -1);
+          if (wordOutcomesRef.current.length > typedWordsRef.current.length) wordOutcomesRef.current.pop();
           inputRef.current = prev;
+          // the re-opened word gets a FRESH attempt: new timing, new error count
+          wordStartRef.current = null;
+          wordErrRef.current = 0;
           setTypedWords(typedWordsRef.current);
           setInput(prev);
         }
@@ -341,7 +398,10 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
         const target = test.words[typedWordsRef.current.length - 1] ?? "";
         if (prev !== target) {
           typedWordsRef.current = typedWordsRef.current.slice(0, -1);
+          if (wordOutcomesRef.current.length > typedWordsRef.current.length) wordOutcomesRef.current.pop();
           inputRef.current = prev;
+          wordStartRef.current = null;
+          wordErrRef.current = 0;
           setTypedWords(typedWordsRef.current);
           setInput(prev);
         }

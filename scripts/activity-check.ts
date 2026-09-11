@@ -204,8 +204,8 @@ console.log("\n=== export/import round-trip ===");
   const payload = exportData(
     { mode: "time", timeDuration: 30, wordCount: 25, punctuation: false, numbers: false, adaptiveIntensity: 65, strictMode: false, liveWpm: true, sound: false, caretStyle: "line", accent: "lime", showCoach: true, onlinePacks: true },
     {
-      keyProfiles: {}, bigramProfiles: {}, confusions: [], errorContexts: [],
-      totalKeystrokes: 0, totalChars: 0, totalTests: 0, totalTimeMs: 0, lastVersion: 3,
+      keyProfiles: {}, bigramProfiles: {}, wordProfiles: {}, confusions: [], errorContexts: [],
+      totalKeystrokes: 0, totalChars: 0, totalTests: 0, totalTimeMs: 0, lastVersion: 4,
     },
     stats
   );

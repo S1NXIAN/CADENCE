@@ -84,6 +84,39 @@ export interface BigramProfile {
   mem: MemCard | null;
 }
 
+/**
+ * One word's final committed attempt in a finished test, captured by the
+ * session hook (word diffs + timing are only known there — backspaces are
+ * invisible to the event log, and word boundaries aren't reconstructible
+ * from it either because ctrl+backspace pops already-logged words).
+ *   ms      — wall time of the FINAL attempt (first keystroke → space), null
+ *             when the attempt produced no keystrokes
+ *   errKeys — wrong keystrokes during the attempt, INCLUDING ones the user
+ *             later backspaced away (a recovered slip still happened)
+ *   partial — attempt truncated by the timer (time mode) or finished with
+ *             junk; skipped by the scheduler entirely
+ */
+export interface WordOutcome {
+  target: string; // displayed target (post punctuation/number transforms)
+  typed: string; // final committed text
+  ms: number | null;
+  errKeys: number;
+  partial?: boolean;
+}
+
+/**
+ * Per-word learning profile: lifetime tally + FSRS memory state, exactly the
+ * shape keys/bigrams use (memory.ts) so one scheduler drives all three layers.
+ * The key is the NORMALIZED word (lowercased, generator punctuation stripped).
+ */
+export interface WordProfile {
+  attempts: number; // lifetime committed attempts of this word
+  errors: number; // attempts whose final diff was imperfect
+  bestWpm: number | null; // best wpm on a PERFECT attempt (fastest-words list)
+  lastSeen: number; // timestamp of last attempt
+  mem: MemCard | null; // FSRS scheduling state (null = never reviewed)
+}
+
 // confusion pair: expected -> typed
 export interface ConfusionPair {
   expected: string;
@@ -104,6 +137,7 @@ export interface ErrorContext {
 export interface LearningData {
   keyProfiles: Record<string, KeyProfile>;
   bigramProfiles: Record<string, BigramProfile>;
+  wordProfiles: Record<string, WordProfile>; // normalized word -> profile
   confusions: ConfusionPair[];
   errorContexts: ErrorContext[];
   totalKeystrokes: number;

@@ -12,6 +12,7 @@ const KEYS = {
 
 const MAX_HISTORY = 500;
 const MAX_ACTIVITY_DAYS = 400; // heatmap ledger window (longer than a 53-week grid)
+const MAX_WORD_PROFILES = 4000; // word memory ceiling — keep the most recently seen
 
 // ---------------------------------------------------------------------------
 // Sanitizers — anything read back from localStorage or an imported backup is
@@ -143,16 +144,47 @@ export function sanitizeLearning(raw: unknown): LearningData {
         .slice(0, 200)
     : [];
 
+  const wordProfiles: LearningData["wordProfiles"] = {};
+  if (isPlainObject(p.wordProfiles)) {
+    let entries = Object.entries(p.wordProfiles);
+    // ceiling: a runaway profile (or hostile import) can't balloon localStorage;
+    // keep the most recently seen words — stale ones rebuild naturally
+    if (entries.length > MAX_WORD_PROFILES) {
+      const lastOf = (e: [string, unknown]): number =>
+        isPlainObject(e[1]) && typeof (e[1] as { lastSeen?: unknown }).lastSeen === "number"
+          ? (e[1] as { lastSeen: number }).lastSeen
+          : 0;
+      entries = entries.sort((a, b) => lastOf(b) - lastOf(a)).slice(0, MAX_WORD_PROFILES);
+    }
+    for (const [k, v] of entries) {
+      if (!isPlainObject(v)) continue;
+      if (!/^[a-z][a-z'-]{0,15}$/.test(k)) continue;
+      const attempts = Math.round(clampNum(v.attempts, 0, 1e8, 0));
+      const errors = Math.round(clampNum(v.errors, 0, attempts, 0));
+      const bestWpmRaw = typeof v.bestWpm === "number" && Number.isFinite(v.bestWpm) ? v.bestWpm : null;
+      const lastSeen = clampNum(v.lastSeen, 0, Number.MAX_SAFE_INTEGER, 0);
+      wordProfiles[k] = {
+        attempts,
+        errors,
+        bestWpm: bestWpmRaw !== null ? clampNum(bestWpmRaw, 0, 500, 0) : null,
+        lastSeen,
+        // missing/corrupt mem is reseeded from the word's own lifetime stats
+        mem: sanitizeMem(v.mem, attempts > 0 ? errors / attempts : 0, attempts, lastSeen),
+      };
+    }
+  }
+
   return {
     keyProfiles,
     bigramProfiles,
+    wordProfiles,
     confusions,
     errorContexts,
     totalKeystrokes: clampNum(p.totalKeystrokes, 0, Number.MAX_SAFE_INTEGER, 0),
     totalChars: clampNum(p.totalChars, 0, Number.MAX_SAFE_INTEGER, 0),
     totalTests: Math.round(clampNum(p.totalTests, 0, 1e6, 0)),
     totalTimeMs: clampNum(p.totalTimeMs, 0, Number.MAX_SAFE_INTEGER, 0),
-    lastVersion: 3,
+    lastVersion: 4,
   };
 }
 

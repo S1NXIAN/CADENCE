@@ -31,13 +31,14 @@ export function emptyLearning(): LearningData {
   return {
     keyProfiles: {},
     bigramProfiles: {},
+    wordProfiles: {},
     confusions: [],
     errorContexts: [],
     totalKeystrokes: 0,
     totalChars: 0,
     totalTests: 0,
     totalTimeMs: 0,
-    lastVersion: 3,
+    lastVersion: 4,
   };
 }
 
@@ -285,8 +286,12 @@ export function finalizeLearning(learning: LearningData, tally?: ReviewTally): v
   learning.totalTests += 1;
 }
 
-/** Latency shrunk toward the motor prior (cold start -> prior itself). */
-function effLatency(ewma: number | null, attempts: number, priorLat: number): number {
+/**
+ * Latency shrunk toward the motor prior (cold start -> prior itself).
+ * Exported for the word scheduler, which estimates a word's expected
+ * duration from the same per-key/bigram evidence.
+ */
+export function effLatency(ewma: number | null, attempts: number, priorLat: number): number {
   if (ewma === null) return priorLat;
   return (attempts * ewma + PRIOR_K_LAT * priorLat) / (attempts + PRIOR_K_LAT);
 }

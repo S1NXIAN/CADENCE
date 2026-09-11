@@ -3,11 +3,12 @@
 import { useMemo, useRef } from "react";
 import type { LearningData, StatsData } from "@/lib/typing/types";
 import { computeWeakKeys, topConfusions, weakBigrams } from "@/lib/typing/profiles";
+import { dueWords, fastestWords, worstWords, type UrgentWord } from "@/lib/typing/word-scheduler";
 import { KeyHeatmap } from "./key-heatmap";
 import { HistoryChart } from "./history-chart";
 import { ActivityHeatmap } from "./activity-heatmap";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { X, Download, Upload, Trash2, Keyboard, Flame, Clock, Gauge, Target } from "lucide-react";
+import { X, Download, Upload, Trash2, Keyboard, Flame, Clock, Gauge, Target, TriangleAlert, Zap, CalendarClock } from "lucide-react";
 
 interface StatsPanelProps {
   open: boolean;
@@ -43,6 +44,15 @@ export function StatsPanel({
   const weak = useMemo(() => computeWeakKeys(learning).slice(0, 8), [learning]);
   const bgs = useMemo(() => weakBigrams(learning, 6), [learning]);
   const confusions = useMemo(() => topConfusions(learning, 5), [learning]);
+  const wordLists = useMemo(
+    () => ({
+      tracked: Object.keys(learning.wordProfiles ?? {}).length,
+      worst: worstWords(learning, 8),
+      fastest: fastestWords(learning, 8),
+      due: dueWords(learning, 6),
+    }),
+    [learning]
+  );
 
   if (!open) return null;
 
@@ -77,6 +87,7 @@ export function StatsPanel({
           <TabsList className="bg-elevated mb-5">
             <TabsTrigger value="overview">overview</TabsTrigger>
             <TabsTrigger value="keys">keys</TabsTrigger>
+            <TabsTrigger value="words">words</TabsTrigger>
             <TabsTrigger value="history">history</TabsTrigger>
             <TabsTrigger value="data">data</TabsTrigger>
           </TabsList>
@@ -142,6 +153,53 @@ export function StatsPanel({
                       <span className="text-hue">{c.expected}</span>
                       <span className="text-dim text-xs">×{c.count}</span>
                     </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="words" className="space-y-6">
+            <p className="text-sub font-mono text-sm leading-relaxed">
+              {wordLists.tracked === 0
+                ? "no words tracked yet — finish a test and every word you type starts building a memory profile"
+                : `${wordLists.tracked} word${wordLists.tracked === 1 ? "" : "s"} in memory. Words you miss return within a few tests; clean, quick words back off for days.`}
+            </p>
+            {wordLists.worst.length > 0 && (
+              <div>
+                <SectionTitle>
+                  <TriangleAlert className="text-err mr-1.5 inline h-3.5 w-3.5" />
+                  worst words — error rate
+                </SectionTitle>
+                <div className="flex flex-wrap gap-2">
+                  {wordLists.worst.map((w) => (
+                    <WordChip key={w.word} word={w} metric="err" />
+                  ))}
+                </div>
+              </div>
+            )}
+            {wordLists.due.length > 0 && (
+              <div>
+                <SectionTitle>
+                  <CalendarClock className="text-hue mr-1.5 inline h-3.5 w-3.5" />
+                  queued for review
+                </SectionTitle>
+                <div className="flex flex-wrap gap-2">
+                  {wordLists.due.map((w) => (
+                    <WordChip key={w.word} word={w} metric="due" />
+                  ))}
+                </div>
+              </div>
+            )}
+            {wordLists.fastest.length > 0 && (
+              <div>
+                <SectionTitle>
+                  <Zap className="text-hue mr-1.5 inline h-3.5 w-3.5" />
+                  fastest words — clean & quick
+                </SectionTitle>
+                <div className="flex flex-wrap gap-2">
+                  {wordLists.fastest.map((w) => (
+                    <WordChip key={w.word} word={w} metric="speed" />
                   ))}
                 </div>
               </div>
@@ -240,6 +298,40 @@ function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div className="text-dim mb-3 font-mono text-xs tracking-widest uppercase">{children}</div>;
+}
+
+const DUE_LABELS = [
+  [60_000, "now"], // < 1 min: overdue or imminent
+  [3_600_000, "m"], // < 1 h: minutes
+  [86_400_000, "h"], // < 1 d: hours
+] as const;
+
+function dueLabel(dueInMs: number | null): string {
+  if (dueInMs === null) return "new";
+  if (dueInMs <= 0) return "due now";
+  for (const [limit, unit] of DUE_LABELS) {
+    if (dueInMs < limit) {
+      const v = Math.max(1, Math.round(dueInMs / (unit === "m" ? 60_000 : unit === "h" ? 3_600_000 : 1)));
+      return `due in ${v}${unit}`;
+    }
+  }
+  return `due in ${Math.round(dueInMs / 86_400_000)}d`;
+}
+
+function WordChip({ word, metric }: { word: UrgentWord; metric: "err" | "due" | "speed" }) {
+  const isErr = metric === "err";
+  const metricText =
+    metric === "err"
+      ? `${(word.errRate * 100).toFixed(0)}% err · ${word.errors}/${word.attempts}`
+      : metric === "speed"
+        ? `${Math.round(word.bestWpm ?? 0)} wpm · ${word.attempts} reps`
+        : `${dueLabel(word.dueInMs)} · ${word.attempts} reps`;
+  return (
+    <span className="bg-elevated inline-flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-sm" style={{ borderColor: "#23252b" }}>
+      <span className={isErr ? "text-err" : "text-hue"}>{word.word}</span>
+      <span className="text-dim text-xs">{metricText}</span>
+    </span>
+  );
 }
 
 function timeAgo(ts: number): string {

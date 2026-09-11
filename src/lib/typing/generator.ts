@@ -1,5 +1,6 @@
 import type { LearningData, Settings, TestMode } from "./types";
 import { bigramUrgencies, keyUrgencies } from "./profiles";
+import { pickReviewWords } from "./word-scheduler";
 import { getAdaptivePool, getCommonPool, getQuotes } from "./pool";
 
 export interface GeneratedTest {
@@ -186,6 +187,10 @@ function interleave(words: string[], drillSet: Set<string>, intensity01: number)
  * rhythm natural. intensity (0..100) controls the drill/flow ratio.
  * Exported (with the drill partition) for probe/test tooling.
  */
+/** review words take at most this share of the drill budget (rest = set-cover) */
+const REVIEW_SHARE = 0.45;
+const REVIEW_HARD_CAP = 8;
+
 export function generateAdaptive(
   learning: LearningData,
   count: number,
@@ -212,7 +217,17 @@ export function generateAdaptive(
     const targetKeys = new Map(urgentKeys.map((u) => [u.key, u.urgency]));
     const targetBgs = new Map(urgentBgs.map((u) => [u.bigram, u.urgency]));
     const targetDrill = Math.round(count * (0.25 + 0.55 * intensity01));
-    drills = greedyCover(pool, targetKeys, targetBgs, targetDrill);
+
+    // Word-review channel: FSRS-due words (recently failed, chronic, or stale)
+    // reserve a slice of the drill budget. Suspension applies ONLY here — the
+    // set-cover picks below ignore word memory, so a word needed to drill a
+    // weak key is served regardless of its own "easy" state.
+    const reviewSlots = Math.min(Math.round(targetDrill * REVIEW_SHARE), REVIEW_HARD_CAP);
+    const reviews = pickReviewWords(learning, new Set(pool), reviewSlots);
+    const reviewSet = new Set(reviews);
+    const cover = greedyCover(pool, targetKeys, targetBgs, Math.max(0, targetDrill - reviews.length));
+    // cover may pick a due word on bigram merit — dedupe without double-serving
+    drills = [...reviews, ...cover.filter((w) => !reviewSet.has(w))];
     focusKeys = urgentKeys.slice(0, 3).map((u) => u.key);
 
     // sampleFlow ADDS its picks to the exclude set it receives (to avoid

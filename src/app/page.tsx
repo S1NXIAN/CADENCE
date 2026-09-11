@@ -8,9 +8,8 @@ import { SettingsModal } from "@/components/typing/settings-modal";
 import { CommandPalette, type PaletteAction } from "@/components/typing/command-palette";
 import { useTypingSession } from "@/hooks/use-typing-session";
 import { generateTest } from "@/lib/typing/generator";
-import {
-  emptyLearning, finalizeLearning, ingestEvents,
-} from "@/lib/typing/profiles";
+import { emptyLearning, finalizeLearning, ingestEvents } from "@/lib/typing/profiles";
+import { finalizeWordReviews, ingestWordOutcomes } from "@/lib/typing/word-scheduler";
 import { generateInsights, nextTestPreview } from "@/lib/typing/insights";
 import { buildTestAudit, type TestAudit } from "@/lib/typing/audit";
 import { onPacksChanged } from "@/lib/typing/pool";
@@ -22,7 +21,7 @@ import {
   exportData, emptyStats, importData, isOnboarded, loadLearning, loadSettings,
   loadStats, persistAll, recordResult, saveLearning, saveSettings, setOnboarded, storedLearningVersion, wipeAll,
 } from "@/lib/typing/storage";
-import type { CharEvent, CoachInsight, LearningData, Settings, StatsData, TestResult } from "@/lib/typing/types";
+import type { CharEvent, CoachInsight, LearningData, Settings, StatsData, TestResult, WordOutcome } from "@/lib/typing/types";
 import { ACCENT_COLORS, DEFAULT_SETTINGS } from "@/lib/typing/types";
 import { Zap, Timer, AlignLeft, Quote, AtSign, Hash, BarChart3, Settings as SettingsIcon, Waves, Keyboard } from "lucide-react";
 
@@ -165,13 +164,16 @@ export default function Page() {
 
   // ---- test completion ----------------------------------------------------
   const handleFinish = useCallback(
-    (result: TestResult, events: CharEvent[], targets: string[], typed: string[]) => {
+    (result: TestResult, events: CharEvent[], targets: string[], typed: string[], wordOutcomes: WordOutcome[]) => {
       setOnboarded();
 
       // update learning model (keystroke-level) + FSRS memory reviews
       const updatedLearning = cloneLearning(learningRef.current);
       const tally = ingestEvents(updatedLearning, events, result.duration * 1000);
       finalizeLearning(updatedLearning, tally);
+      // word-level memory: lifetime tallies folded in, then FSRS word reviews
+      const wordTally = ingestWordOutcomes(updatedLearning, wordOutcomes);
+      finalizeWordReviews(updatedLearning, wordTally);
       setLearning(updatedLearning);
 
       // personal best + record
