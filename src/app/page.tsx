@@ -319,7 +319,7 @@ export default function Page() {
       </header>
 
       {/* mode bar */}
-      <nav className="mt-6 flex justify-center px-4" aria-label="test modes">
+      <nav className="mt-5 flex justify-center px-4" aria-label="test modes">
         <div className="flex flex-wrap items-center justify-center gap-1">
           {(["adaptive", "time", "words", "quote"] as const).map((m) => (
             <button
@@ -385,8 +385,8 @@ export default function Page() {
       </div>
 
       {/* main stage */}
-      <main className="flex flex-1 flex-col items-center justify-center px-4 py-10 sm:px-8">
-        <div className="w-full max-w-3xl">
+      <main className="flex flex-1 flex-col items-center justify-center px-4 py-6 sm:px-8 xl:py-8">
+        <div className="w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
           {done ? (
             <Results result={resultForDisplay} insights={settings.showCoach ? insights : []} />
           ) : (
@@ -405,7 +405,7 @@ export default function Page() {
                 focusSignal={focusSignal}
               />
               {settings.showCoach && coachLine && (
-                <div className="text-dim mt-8 flex items-start gap-2.5 px-1 font-mono text-[13px] leading-relaxed">
+                <div className="text-dim mt-6 flex items-start gap-2.5 px-1 font-mono text-[13px] leading-relaxed xl:mt-7 xl:text-sm">
                   <Zap className="text-hue mt-0.5 h-4 w-4 shrink-0" />
                   <span>{coachLine}</span>
                 </div>

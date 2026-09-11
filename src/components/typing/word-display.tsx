@@ -45,8 +45,9 @@ export function WordDisplay({
   const [focused, setFocused] = useState(true);
 
   // render a window of words around the current position for performance
-  const from = Math.max(0, wordIndex - 12);
-  const to = Math.min(words.length, Math.max(wordIndex + 30, 30));
+  // (wide screens fit more words per line, so keep a generous window)
+  const from = Math.max(0, wordIndex - 15);
+  const to = Math.min(words.length, Math.max(wordIndex + 45, 45));
   const visible = words.slice(from, to);
 
   // measure caret position after every render that affects it
@@ -139,29 +140,29 @@ export function WordDisplay({
       />
 
       {/* live metrics row */}
-      <div className="mb-4 flex h-8 items-end justify-between px-1 font-mono">
-        <div className="flex items-baseline gap-7">
+      <div className="mb-4 flex h-8 items-end justify-between px-1 font-mono xl:mb-5 xl:h-10">
+        <div className="flex items-baseline gap-7 xl:gap-9">
           {timeLeft !== null ? (
-            <div className="text-hue text-3xl font-semibold tabular-nums" aria-label="seconds left">
+            <div className="text-hue text-3xl font-semibold tabular-nums xl:text-4xl" aria-label="seconds left">
               {timeLeft}
             </div>
           ) : (
-            <div className="text-dim tabular-nums text-sm">
+            <div className="text-dim tabular-nums text-sm xl:text-base">
               {Math.min(wordIndex + 1, words.length)} / {words.length} words
             </div>
           )}
           {settings.liveWpm && status === "running" && (
             <>
-              <div className="text-sub tabular-nums text-lg" aria-live="off">
-                {liveWpm} <span className="text-dim text-xs">wpm</span>
+              <div className="text-sub tabular-nums text-lg xl:text-2xl" aria-live="off">
+                {liveWpm} <span className="text-dim text-xs xl:text-sm">wpm</span>
               </div>
-              <div className="text-sub tabular-nums text-lg" aria-live="off">
-                {liveAcc}% <span className="text-dim text-xs">acc</span>
+              <div className="text-sub tabular-nums text-lg xl:text-2xl" aria-live="off">
+                {liveAcc}% <span className="text-dim text-xs xl:text-sm">acc</span>
               </div>
             </>
           )}
         </div>
-        <div className="text-dim pb-1 text-xs tracking-wide uppercase">
+        <div className="text-dim pb-1 text-xs tracking-wide uppercase xl:text-sm">
           {settings.mode === "adaptive" ? "curated test" : settings.mode}
         </div>
       </div>
@@ -172,15 +173,19 @@ export function WordDisplay({
         className={`word-line relative overflow-hidden transition-opacity duration-200 ${
           focused ? "opacity-100" : "opacity-35"
         }`}
-        style={{ height: "calc(var(--word-line-h) * 3)" }}
+        style={{ height: "calc(var(--word-line-h) * var(--word-lines, 3))" }}
         aria-label="typing test words"
         role="textbox"
         aria-readonly
       >
         <div
           ref={innerRef}
-          className="relative px-1 font-mono text-[1.55rem] leading-[3.6rem] transition-transform duration-150 ease-out sm:text-[1.7rem]"
-          style={{ transform: `translateY(-${scrollY}px)` }}
+          className="relative px-1 font-mono transition-transform duration-150 ease-out"
+          style={{
+            transform: `translateY(-${scrollY}px)`,
+            fontSize: "var(--word-size)",
+            lineHeight: "var(--word-line-h)",
+          }}
         >
           {/* caret */}
           {status !== "done" && focused && (
@@ -202,7 +207,7 @@ export function WordDisplay({
             const wi = from + vi;
             const typed = typedFor(wi);
             const isCurrent = wi === wordIndex;
-            const chars = [];
+            const chars: React.ReactNode[] = [];
             const maxLen = Math.max(word.length, typed.length);
             for (let ci = 0; ci < maxLen; ci++) {
               const targetChar = ci < word.length ? word[ci] : null;

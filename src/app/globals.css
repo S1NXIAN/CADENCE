@@ -121,9 +121,43 @@
   .border-hue { border-color: var(--hue); }
 }
 
-/* ---------- word stream ---------- */
+/* ---------- word stream ----------
+   Scales with the viewport so big desktop screens get big words:
+   container width grows (page.tsx) in lockstep, keeping ~45-50 chars/line. */
 .word-line {
+  --word-size: 1.55rem;
   --word-line-h: 3.6rem;
+  --word-lines: 3;
+}
+@media (min-width: 640px) {
+  .word-line {
+    --word-size: 1.7rem;
+    --word-line-h: 3.8rem;
+  }
+}
+@media (min-width: 1024px) {
+  .word-line {
+    --word-size: 2rem;
+    --word-line-h: 4.4rem;
+  }
+}
+@media (min-width: 1280px) {
+  .word-line {
+    --word-size: 2.25rem;
+    --word-line-h: 5rem;
+  }
+}
+@media (min-width: 1536px) {
+  .word-line {
+    --word-size: 2.5rem;
+    --word-line-h: 5.5rem;
+  }
+}
+/* tall desktop screens get a 4th visible line to fill vertical space */
+@media (min-width: 1280px) and (min-height: 820px) {
+  .word-line {
+    --word-lines: 4;
+  }
 }
 
 .caret-blink {
