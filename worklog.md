@@ -99,3 +99,20 @@ Work Log:
 Stage Summary:
 - Mid-test top-line reshuffle eliminated: between line crossings the stream layout is now byte-stable; window shrinks/grows only by whole lines at pixel-invisible moments.
 - Verified file: src/components/typing/word-display.tsx only. Regression harness updated (rewrap assertions) at scripts/e2e-scroll-fix.sh; crossing probe at scripts/probe-crossing.sh.
+
+---
+Task ID: 6
+Agent: Super Z (main agent)
+Task: User report — spacing past an unfinished word "lights up the whole letters of that word" instead of only marking/blurring the skipped letters.
+
+Work Log:
+- Reproduced + inspected computed styles: skipped letters rendered FULL WHITE (rgb(232,234,240)) — identical to correctly-typed letters.
+- Root cause (app-wide, not just word display): Cadence colors were hand-written utilities in globals.css (@layer utilities: .text-hue/.text-err/.text-dim/…) and NOT registered in Tailwind's @theme. Every opacity-modified variant (text-err/50, text-err/60, border-hue/50, bg-hue/15, border-hue/30, bg-hue/10, bg-hue/20) matched NO CSS — silently inheriting body white or default border color. Broken call sites: word-display (missed chars, extra chars, active-word underline), page.tsx (logo box, active mode button, progress dot), results.tsx (PB badge), settings-modal.tsx (active option).
+- Fix in globals.css: registered all Cadence tokens in @theme inline (--color-hue/err/warn/sub/dim/faint/surface/elevated/missed → var(--…)); deleted the hand-written one-off utilities; Tailwind now generates the full utility set with working opacity modifiers (verified: active underline = lime/50, mode button bg = lime/15, mode border = lime/30).
+- New "missed" treatment per user intent: --missed token = muted mauve #93676f (≈ 35% error + 65% dim). Skipped letters use text-missed — clearly dimmer than typed white, subtly red-tinted so the skip is still visible, never "lit up". NOTE: the token value must be a literal hex — a color-mix() value inside @theme inline stops Tailwind from generating the utility (type-check fails silently).
+- extra chars stay text-err/60 (now actually renders 60% red instead of inheriting white); wrong keystrokes unchanged (text-err full red).
+- Verified: computed colors (typed=white, skipped=rgb(147,103,111), wrong=rgb(248,113,113)); screenshot shows dimmed skipped word + lime active underline + tinted mode button; full e2e re-run PASS (0 backward scrolls, 0 rewraps, 0 caret mispositions); tsc + eslint clean.
+
+Stage Summary:
+- All Cadence opacity-modified utilities now real (theme-registered tokens); skipped-letter feedback is a muted mauve "blur" instead of accidentally full-white.
+- Files: src/app/globals.css (theme registration), src/components/typing/word-display.tsx (text-missed). Visual side effect: several UI elements regain their intended lime tint (mode button, PB badge, active underline, settings options).

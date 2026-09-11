@@ -1,29 +1,29 @@
-WORDS: ask|residence|turn|support|curious|butter|others|service|whiskey|yesterday|industry|humble|sleek|question|energy|wife|sculpture|favorite|second|unusual|effect|history|hear|news|panda
+WORDS: symbol|shadow|keen|new|space|and|determined|present|president|professional|situated|be|student|difference|action|hypothesis|crisp|word|settlement|sparrow|lot|golden|not|go|price
 TOTAL=25
-word 1 ('ask') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 2 ('residence') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 3 ('turn') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 4 ('support') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 5 ('curious') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 6 ('butter') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 7 ('others') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 8 ('service') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 9 ('whiskey') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 10 ('yesterday') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 11 ('industry') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 12 ('humble') ty=0 from=0 rewrap=0 caret=OK backward=0
-word 13 ('sleek') ty=-80 from=0 rewrap=0 caret=OK backward=0
-word 14 ('question') ty=-80 from=0 rewrap=0 caret=OK backward=0
-word 15 ('energy') ty=-80 from=0 rewrap=0 caret=OK backward=0
-word 16 ('wife') ty=-80 from=0 rewrap=0 caret=OK backward=0
-word 17 ('sculpture') ty=-80 from=0 rewrap=0 caret=OK backward=0
-word 18 ('favorite') ty=-80 from=0 rewrap=0 caret=OK backward=0
-word 19 ('second') ty=-80 from=7 rewrap=0 caret=OK backward=0
-word 20 ('unusual') ty=-80 from=7 rewrap=0 caret=OK backward=0
-word 21 ('effect') ty=-80 from=7 rewrap=0 caret=OK backward=0
-word 22 ('history') ty=-80 from=7 rewrap=0 caret=OK backward=0
-word 23 ('hear') ty=-80 from=7 rewrap=0 caret=OK backward=0
-word 24 ('news') ty=-80 from=7 rewrap=0 caret=OK backward=0
-word 25 ('panda') -> results screen
+word 1 ('symbol') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 2 ('shadow') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 3 ('keen') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 4 ('new') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 5 ('space') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 6 ('and') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 7 ('determined') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 8 ('present') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 9 ('president') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 10 ('professional') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 11 ('situated') ty=0 from=0 rewrap=0 caret=OK backward=0
+word 12 ('be') ty=-80 from=0 rewrap=0 caret=OK backward=0
+word 13 ('student') ty=-80 from=0 rewrap=0 caret=OK backward=0
+word 14 ('difference') ty=-80 from=0 rewrap=0 caret=OK backward=0
+word 15 ('action') ty=-80 from=0 rewrap=0 caret=OK backward=0
+word 16 ('hypothesis') ty=-80 from=0 rewrap=0 caret=OK backward=0
+word 17 ('crisp') ty=-80 from=0 rewrap=0 caret=OK backward=0
+word 18 ('word') ty=-80 from=7 rewrap=0 caret=OK backward=0
+word 19 ('settlement') ty=-80 from=7 rewrap=0 caret=OK backward=0
+word 20 ('sparrow') ty=-80 from=7 rewrap=0 caret=OK backward=0
+word 21 ('lot') ty=-80 from=7 rewrap=0 caret=OK backward=0
+word 22 ('golden') ty=-80 from=7 rewrap=0 caret=OK backward=0
+word 23 ('not') ty=-80 from=7 rewrap=0 caret=OK backward=0
+word 24 ('go') ty=-80 from=7 rewrap=0 caret=OK backward=0
+word 25 ('price') -> results screen
 
 RESULT: backward_scroll_events=0 rewrap_events=0 caret_mispositioned=0

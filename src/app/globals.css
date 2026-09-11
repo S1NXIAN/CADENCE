@@ -41,6 +41,18 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  /* Cadence tokens — registering them here makes ALL opacity modifiers work
+     (text-err/60, bg-hue/15, border-hue/30 …). Hand-written one-off classes
+     silently matched nothing for /N variants and fell back to inherited color. */
+  --color-hue: var(--hue);
+  --color-err: var(--error);
+  --color-warn: var(--warn);
+  --color-sub: var(--sub);
+  --color-dim: var(--dim);
+  --color-faint: var(--faint);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-missed: var(--missed);
 }
 
 /* Cadence dark palette — warm charcoal, phosphor-green accent */
@@ -89,6 +101,11 @@
   --faint: #3d414b;
   --surface: #131417;
   --elevated: #1a1c21;
+  /* skipped (space-pressed early) letters — muted mauve, reads as "blurred
+     past", never lights up like a wrong keystroke.
+     (≈ oklab mix of 35% --error + 65% --dim, kept as a literal so Tailwind
+     reliably type-checks it as a color and generates the utilities.) */
+  --missed: #93676f;
 }
 
 @layer base {
@@ -109,16 +126,8 @@
 }
 
 @layer utilities {
-  /* word stream tokens */
-  .text-hue { color: var(--hue); }
-  .bg-hue { background-color: var(--hue); }
-  .text-sub { color: var(--sub); }
-  .text-dim { color: var(--dim); }
-  .text-faint { color: var(--faint); }
-  .text-err { color: var(--error); }
-  .bg-surface { background-color: var(--surface); }
-  .bg-elevated { background-color: var(--elevated); }
-  .border-hue { border-color: var(--hue); }
+  /* Cadence color utilities (text-hue, bg-hue/15, text-err, border-hue/50 …)
+     are generated from the @theme inline tokens above. */
 }
 
 /* ---------- word stream ----------

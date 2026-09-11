@@ -273,8 +273,9 @@ export function WordDisplay({
                 else if (typedChar === targetChar) cls = "text-foreground";
                 else cls = "text-err";
               } else if (targetChar !== null && wi < wordIndex) {
-                // missed char in a submitted word
-                cls = "text-err/50";
+                // skipped char (word submitted early) — muted, reads as
+                // blurred past rather than lighting up like a wrong key
+                cls = "text-missed";
               }
               chars.push(
                 <span key={ci} data-ci={ci} className={cls}>
