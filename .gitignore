@@ -30,8 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — secrets stay local; only the example is tracked
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -52,3 +53,19 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+# ── local runtime state ─────────────────────────────
+*.pid
+/db/
+
+# ── agent / sandbox artifacts (not part of the app) ──
+/worklog.md
+/tool-results/
+/upload/
+/download/
+/scripts/bug_frames/
+/scripts/*.png
+/scripts/*.jpg
+/scripts/*.raw
+/scripts/*.txt
+/scripts/research-*.json
