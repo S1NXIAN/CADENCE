@@ -79,10 +79,6 @@ for (const { row, chars } of ROW_DEFS) {
   }
 }
 
-export function keyClass(ch: string): KeyClass | null {
-  return KEY_CLASS[ch] ?? null;
-}
-
 // ---------------------------------------------------------------------------
 // Prior tables. Baselines are calibrated to a typical intermediate typist
 // (~50-60 WPM): ~3.5% per-keystroke error rate, ~150ms home-row index interval.
@@ -231,14 +227,4 @@ export function classifyBigram(a: string, b: string): BigramPrior {
     err: (PRIOR_BASE_ERR * err) / NORM_ERR,
     lat: (PRIOR_BASE_LAT * lat) / NORM_LAT,
   };
-}
-
-/** Prior error rate for a whole word (max transition prior, for quick filters). */
-export function wordPriorErr(word: string): number {
-  let worst = PRIOR_BASE_ERR;
-  for (let i = 0; i < word.length - 1; i++) {
-    const p = classifyBigram(word[i], word[i + 1]);
-    if (p.err > worst) worst = p.err;
-  }
-  return worst;
 }

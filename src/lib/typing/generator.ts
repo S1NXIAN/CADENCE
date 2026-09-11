@@ -235,9 +235,13 @@ function generateTime(
 ): { words: string[] } {
   // generate plenty of words for the longest plausible duration
   const approxWords = Math.ceil((duration * 5.5) / 1.2) + 30;
+  const pool = getCommonPool();
   const words: string[] = [];
-  while (words.length < approxWords) {
-    words.push(pick(getCommonPool()));
+  for (let i = 0; i < approxWords; i++) {
+    let w = pick(pool);
+    // avoid immediate repetition (same guard as generateWords)
+    while (words.length > 0 && words[words.length - 1] === w) w = pick(pool);
+    words.push(w);
   }
   return { words: withTransforms(words, withPunct, withNumbers) };
 }

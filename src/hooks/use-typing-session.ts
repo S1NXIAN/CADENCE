@@ -101,7 +101,7 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
     let totalChars = 0;
     for (let i = 0; i < typed.length; i++) {
       const d = diffWord(targetWords[i] ?? "", typed[i]);
-      correctChars += d.correct + d.missed * 0; // missed don't count
+      correctChars += d.correct; // missed chars don't count toward live wpm
       totalChars += d.correct + d.incorrect + d.extra;
     }
     // current word partial
@@ -284,14 +284,21 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
     const idx = typedWordsRef.current.length;
     const target = test.words[idx] ?? "";
     const typed = inputRef.current;
+    const nowT = startedAtRef.current ? performance.now() - startedAtRef.current : 0;
 
     // record missed chars as silent error events for the learning engine
     if (typed.length < target.length) {
-      const t = startedAtRef.current ? performance.now() - startedAtRef.current : 0;
       for (let i = typed.length; i < target.length; i++) {
-        eventsRef.current.push({ t, expected: target[i], typed: "", correct: false });
+        eventsRef.current.push({ t: nowT, expected: target[i], typed: "", correct: false });
       }
     }
+
+    // the space keystroke itself enters the event log: it resets the bigram
+    // chain at word boundaries (the last char of the previous word and the
+    // first char of this one were NEVER adjacent — a space sits between them)
+    // and counts as the keystroke it is for accuracy/sound
+    eventsRef.current.push({ t: nowT, expected: " ", typed: " ", correct: true });
+    optsRef.current.onKeystroke?.(true);
 
     typedWordsRef.current = [...typedWordsRef.current, typed];
     inputRef.current = "";

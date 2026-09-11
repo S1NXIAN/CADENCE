@@ -1,21 +1,27 @@
-import type { CoachInsight, LearningData, Settings, StatsData, TestResult } from "./types";
+import type { CoachInsight, LearningData, PersonalBest, Settings, StatsData, TestResult } from "./types";
 import { computeWeakKeys, topConfusions, topErrorContexts, weakBigrams } from "./profiles";
 
 /**
  * Generate human coaching insights after a completed test.
  * This is the "wants you to improve" personality of the app.
+ *
+ * `stats` should be the POST-record stats (so streak/history messages reflect
+ * the test that just finished); `prevBest` is the personal best BEFORE this
+ * test was recorded — pass it to keep the "new PB +delta" message computable
+ * (after recording, the PB already IS this result, so the delta would read 0).
  */
 export function generateInsights(
   result: TestResult,
   stats: StatsData,
   learning: LearningData,
-  settings: Settings
+  settings: Settings,
+  prevBest?: PersonalBest | null
 ): CoachInsight[] {
   const insights: CoachInsight[] = [];
 
   // 1. personal best
   if (result.isPersonalBest && result.wpm > 0) {
-    const prev = stats.personalBests[result.modeLabel];
+    const prev = prevBest !== undefined ? prevBest : stats.personalBests[result.modeLabel];
     if (prev && result.wpm > prev.wpm) {
       insights.push({
         kind: "record",

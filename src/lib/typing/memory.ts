@@ -140,10 +140,16 @@ export function sanitizeMem(raw: unknown, fallbackErrRate: number, fallbackAttem
     if (fallbackAttempts > 0) return seedMemFromHistory(fallbackErrRate, fallbackAttempts, lastSeen);
     return null;
   }
-  // A reviewed card with no last-review timestamp would break retrievability
-  // forever (R reads as 0 → the item sits at max urgency and is drilled
-  // every single test). Coerce to a day ago so scheduling stays sane.
-  const last = v.last === null ? Date.now() - 86400000 : num(v.last, 0, Number.MAX_SAFE_INTEGER, Date.now() - 86400000);
+  // A reviewed card with no (or a pre-2001) last-review timestamp would break
+  // retrievability forever (R reads as 0 → the item sits at max urgency and
+  // is drilled every single test). Coerce to a day ago so scheduling stays
+  // sane. 0 is not caught by the nullish check — it's a valid number.
+  const DAY_AGO = Date.now() - 86400000;
+  const EPOCH_FLOOR = 946684800000; // 2001-01-01
+  const last =
+    v.last === null || (typeof v.last === "number" && v.last < EPOCH_FLOOR)
+      ? DAY_AGO
+      : num(v.last, EPOCH_FLOOR, Number.MAX_SAFE_INTEGER, DAY_AGO);
   return {
     s: num(v.s, 0, 240, 0.2),
     d: num(v.d, 1, 10, 5),

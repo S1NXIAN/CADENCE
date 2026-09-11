@@ -15,13 +15,30 @@ agent-browser set viewport 1366 768 >/dev/null
 agent-browser open "$URL" >/dev/null
 sleep 2.5
 
-# decode helper: agent-browser eval prints the result JSON-encoded (often twice)
+# the regression scenario is a 25-WORD test; persisted settings may point at
+# quote/time mode (earlier smokes end there) — force words/25 deterministically
+agent-browser eval "(() => {
+  const btn = (t) => Array.from(document.querySelectorAll('button')).find(x => x.textContent.trim() === t);
+  const words = btn('words'); if (words) words.click();
+  return 'words-mode';
+})()" >/dev/null 2>&1 || true
+sleep 0.4
+agent-browser eval "(() => {
+  const btn = (t) => Array.from(document.querySelectorAll('button')).find(x => x.textContent.trim() === t);
+  const c = btn('25'); if (c) c.click();
+  return '25';
+})()" >/dev/null 2>&1 || true
+sleep 0.8
+
+# decode helper: agent-browser eval prints the result JSON-encoded (sometimes twice)
 decode() { python3 -c "
 import json,sys
 raw = open('$TMP').read().strip()
 try:
     v = json.loads(raw)
-    if isinstance(v, str): v = json.loads(v)
+    if isinstance(v, str):
+        try: v = json.loads(v)
+        except Exception: pass
     print(json.dumps(v))
 except Exception:
     print(raw)
@@ -36,7 +53,9 @@ import json,re
 raw = open('/tmp/w.raw').read().strip()
 try:
     v = json.loads(raw)
-    if isinstance(v, str): v = json.loads(v)
+    if isinstance(v, str):
+        try: v = json.loads(v)
+        except Exception: pass
     print(v)
 except Exception:
     m = re.search(r'\"([A-Za-z|]+)\"', raw)

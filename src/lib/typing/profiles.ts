@@ -1,4 +1,3 @@
-import { State } from "ts-fsrs";
 import type {
   BigramProfile,
   CharEvent,
@@ -446,6 +445,3 @@ export function topConfusions(learning: LearningData, topN = 5): ConfusionPair[]
     .sort((a, b) => b.count - a.count)
     .slice(0, topN);
 }
-
-// kept for consumers that import State through profiles (no-op re-export guard)
-export const MEMORY_STATE_NEW = State.New;

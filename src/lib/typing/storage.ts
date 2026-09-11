@@ -72,15 +72,19 @@ export function sanitizeLearning(raw: unknown): LearningData {
   if (isPlainObject(p.keyProfiles)) {
     for (const [k, v] of Object.entries(p.keyProfiles)) {
       if (!isPlainObject(v)) continue;
-      if (!/^[a-z0-9',.;!?-]{1,2}$/i.test(k)) continue;
+      if (!/^[a-z0-9',.;!?-]{1}$/i.test(k)) continue;
       const attempts = clampNum(v.attempts, 0, 1e9, 0);
       const errRate = clampNum(v.errRate, 0, 1, 0);
       const lastSeen = clampNum(v.lastSeen, 0, Number.MAX_SAFE_INTEGER, 0);
+      // latency must stay in a sane band: a hand-edited 1e300 (finite!) would
+      // poison personalMedianLatency and collapse ALL urgency/grading math
+      const latencyRaw = typeof v.latency === "number" && Number.isFinite(v.latency) ? v.latency : null;
+      const latency = latencyRaw !== null ? Math.min(2000, Math.max(0, latencyRaw)) : null;
       keyProfiles[k.toLowerCase()] = {
         attempts,
         errors: Math.round(clampNum(v.errors, 0, 1e9, attempts * errRate)),
         errRate,
-        latency: typeof v.latency === "number" && Number.isFinite(v.latency) ? v.latency : null,
+        latency,
         lastSeen,
         mem: sanitizeMem(v.mem, errRate, attempts, lastSeen),
       };
@@ -95,11 +99,13 @@ export function sanitizeLearning(raw: unknown): LearningData {
       const attempts = clampNum(v.attempts, 0, 1e9, 0);
       const errRate = clampNum(v.errRate, 0, 1, 0);
       const lastSeen = clampNum(v.lastSeen, 0, Number.MAX_SAFE_INTEGER, 0);
+      const latencyRaw = typeof v.latency === "number" && Number.isFinite(v.latency) ? v.latency : null;
+      const latency = latencyRaw !== null ? Math.min(2000, Math.max(0, latencyRaw)) : null;
       bigramProfiles[k.toLowerCase()] = {
         attempts,
         errors: Math.round(clampNum(v.errors, 0, 1e9, attempts * errRate)),
         errRate,
-        latency: typeof v.latency === "number" && Number.isFinite(v.latency) ? v.latency : null,
+        latency,
         lastSeen,
         mem: sanitizeMem(v.mem, errRate, attempts, lastSeen),
       };
@@ -107,16 +113,33 @@ export function sanitizeLearning(raw: unknown): LearningData {
   }
 
   const confusions = Array.isArray(p.confusions)
-    ? p.confusions.filter(
-        (c): c is LearningData["confusions"][number] =>
-          isPlainObject(c) && typeof c.expected === "string" && typeof c.typed === "string"
-      )
+    ? p.confusions
+        .map((c): LearningData["confusions"][number] | null => {
+          if (!isPlainObject(c)) return null;
+          if (typeof c.expected !== "string" || typeof c.typed !== "string") return null;
+          if (!c.expected || !c.typed) return null;
+          return {
+            expected: c.expected.slice(0, 3),
+            typed: c.typed.slice(0, 3),
+            count: Math.round(clampNum(c.count, 0, 1e6, 1)),
+            lastSeen: clampNum(c.lastSeen, 0, Number.MAX_SAFE_INTEGER, 0),
+          };
+        })
+        .filter((c): c is LearningData["confusions"][number] => c !== null)
+        .slice(0, 200)
     : [];
   const errorContexts = Array.isArray(p.errorContexts)
-    ? p.errorContexts.filter(
-        (c): c is LearningData["errorContexts"][number] =>
-          isPlainObject(c) && typeof c.trigram === "string"
-      )
+    ? p.errorContexts
+        .map((c): LearningData["errorContexts"][number] | null => {
+          if (!isPlainObject(c) || typeof c.trigram !== "string" || !c.trigram) return null;
+          return {
+            trigram: c.trigram.slice(0, 8),
+            count: Math.round(clampNum(c.count, 0, 1e6, 1)),
+            lastSeen: clampNum(c.lastSeen, 0, Number.MAX_SAFE_INTEGER, 0),
+          };
+        })
+        .filter((c): c is LearningData["errorContexts"][number] => c !== null)
+        .slice(0, 200)
     : [];
 
   return {
@@ -196,7 +219,9 @@ export function sanitizeStats(raw: unknown): StatsData {
     for (const [k, v] of Object.entries(p.personalBests)) {
       if (isPlainObject(v) && typeof v.wpm === "number") {
         personalBests[k] = {
-          wpm: v.wpm,
+          // clamp like history entries — `{"wpm":1e999}` parses as Infinity
+          // and would poison every future isPB comparison for that mode
+          wpm: clampNum(v.wpm, 0, 500, 0),
           accuracy: clampNum(v.accuracy, 0, 100, 0),
           timestamp: clampNum(v.timestamp, 0, Number.MAX_SAFE_INTEGER, 0),
         };

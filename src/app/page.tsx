@@ -173,7 +173,7 @@ export default function Page() {
       setLearning(updatedLearning);
 
       // personal best + record
-      const prevBest = stats.personalBests[result.modeLabel];
+      const prevBest = stats.personalBests[result.modeLabel] ?? null;
       const isPB = !prevBest || result.wpm > prevBest.wpm;
       const stamped: TestResult = { ...result, isPersonalBest: isPB };
       const updatedStats = recordResult(stats, stamped);
@@ -181,7 +181,10 @@ export default function Page() {
 
       persistAll(settingsRef.current, updatedLearning, updatedStats);
       setResultForDisplay(stamped);
-      setInsights(generateInsights(stamped, stats, updatedLearning, settingsRef.current));
+      // POST-record stats: the streak/history notes reflect the test that just
+      // finished (pre-record stats showed the stale streak on a new day);
+      // prevBest keeps the "new PB +X" delta computable
+      setInsights(generateInsights(stamped, updatedStats, updatedLearning, settingsRef.current, prevBest));
     },
     [stats]
   );
