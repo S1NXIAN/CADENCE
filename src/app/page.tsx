@@ -183,8 +183,10 @@ export default function Page() {
       setResultForDisplay(stamped);
       // POST-record stats: the streak/history notes reflect the test that just
       // finished (pre-record stats showed the stale streak on a new day);
-      // prevBest keeps the "new PB +X" delta computable
-      setInsights(generateInsights(stamped, updatedStats, updatedLearning, settingsRef.current, prevBest));
+      // prevBest keeps the "new PB +X" delta computable. The raw keystroke log
+      // goes in too — the coach reads THIS test's actual slips, pauses and
+      // clusters instead of judging from aggregates alone.
+      setInsights(generateInsights(stamped, events, updatedStats, updatedLearning, settingsRef.current, prevBest));
     },
     [stats]
   );

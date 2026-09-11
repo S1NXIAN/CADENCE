@@ -135,9 +135,29 @@ export interface WeakKey {
   attempts: number;
 }
 
+/**
+ * A coach note. `kind` drives the icon and tone; `title` is the short bold
+ * headline (the observation), `message` the explanation/coaching, and
+ * `metric` an optional compact stat chip shown on the right
+ * (e.g. "78 → 61 wpm", "'e'→'r' ×7").
+ */
+export type CoachInsightKind =
+  | "focus"
+  | "accuracy"
+  | "speed"
+  | "trend"
+  | "record"
+  | "streak"
+  | "tip"
+  | "error" // this-test error diagnosis (clusters, dropped letters, slips)
+  | "rhythm" // consistency / stamina / warmup / hesitation
+  | "recovery"; // progress: keys leaving the watch list
+
 export interface CoachInsight {
-  kind: "focus" | "accuracy" | "speed" | "trend" | "record" | "streak" | "tip";
-  message: string;
+  kind: CoachInsightKind;
+  title?: string; // short bold headline — the observed fact
+  message: string; // coaching body
+  metric?: string; // compact stat chip
 }
 
 export const ACCENT_COLORS: Record<Settings["accent"], { hue: string; name: string }> = {

@@ -226,3 +226,25 @@ Work Log:
 Stage Summary:
 - The learning model now only ever sees physically real transitions: spaces are keystrokes, word boundaries reset the bigram chain, and FSRS schedules only genuine motor items — curation targets and bigram storage are no longer polluted by ~1 fake pair per word. Storage/import hardening closed the remaining untrusted-JSON holes (PB wpm Infinity, huge finite latencies, junk confusion/context entries, epoch-0 last-review). Coach streak message reflects the test that just finished. Dead code removed; time-mode duplicate guard added; scroll regression script made mode-independent.
 - Files: src/hooks/use-typing-session.ts (space events + cleanup), src/lib/typing/storage.ts (sanitizers), src/lib/typing/memory.ts (sanitizeMem epoch floor), src/lib/typing/insights.ts + src/app/page.tsx (post-record stats + prevBest), src/lib/typing/generator.ts (time-mode dup guard), src/lib/typing/profiles.ts + motor.ts (dead code). New tools: scripts/check-boundaries.ts, scripts/e2e-boundary.sh; fixed scripts/e2e-scroll-fix.sh.
+
+---
+Task ID: 12
+Agent: Super Z (main agent)
+Task: "do a full coach notes overhaul. make coach more observants about the errors, inconsestency and improvements etc."
+
+Work Log:
+- Read the full coach pipeline (insights.ts, types.ts, page.tsx wiring, results.tsx rendering, use-typing-session event log shape, profiles/memory/motor data surface) before designing. Old coach: 8 flat signals, max 3 icon+string rows, never saw the keystroke log or the per-second samples.
+- Extended CoachInsight in types.ts: added CoachInsightKind union (+ "error" | "rhythm" | "recovery"), optional `title` (bold headline) and `metric` (compact stat chip). Old 7 kinds kept for compat.
+- Rewrote src/lib/typing/insights.ts (coach engine v2):
+  * NEW forensics layer analyzeEvents(): reads THIS test's raw CharEvent log — per-key latency samples (mirror of ingestEvents rules), hesitations >= 900ms, this-test confusion pairs, focus-key slips (wrong presses + dropped letters attributed to the expected key), missed/extra counts.
+  * NEW forensics layer analyzeCurve(): converts cumulative raw samples into per-second instantaneous wpm (inst(k)=raw(k)*k - raw(k-1)*(k-1)), then derives fade (first 35% vs last 35% of active seconds), warmup (first 3 active vs overall), peak/trough, worst single second and worst 3-second error window.
+  * 20 prioritized detectors (record PB/baseline/near-miss 85/55, error tax 88/80, accuracy bands 92/64/50, wpm trend 60/62, accuracy drift 68, stamina fade 78, cold open 54, error cluster 74, burst spread 56, focus-slip 76 / targets-held-clean 44, dropped-letters/overshoot 66/62, merged lifetime+this-test confusion habit 70, trigram transition 58, slowest keys this run 48 (vs personalMedianLatency, now exported from profiles.ts), longest freeze 52, speed-push clearance 58, recovered keys (FSRS R >= 0.8 + clean EWMA) 45, FSRS due queue 38, streak 30, adaptive nudge 20).
+  * Selector: priority sort, 1 note per kind (tips may double), max 4, message dedupe. Phrase variants rotate deterministically per test via hash(result.id) so repeated archetypes don't read identically.
+  * nextTestPreview upgraded: names keys AND transitions plus a 48h FSRS due-queue suffix ("Next test attacks your keys 'u', 'j' and transitions 'ju', plus 11 items due for a refresher.").
+- page.tsx: generateInsights now receives the finished test's raw `events` (aggregates alone no longer drive the notes).
+- results.tsx: note cards upgraded — bold headline, body, right-aligned metric chip, count badge next to "coach notes", lucide icons for new kinds (Crosshair=error, Activity=rhythm, Sprout=recovery).
+- Verification: rewrote scripts/check-insights.ts into a 5-archetype probe (sloppy/fade/cluster/focus-slip, clean PB, cold start, near-miss + slow keys, due-queue preview) with 7 assertions — ALL PASS; tsc filtered-clean; eslint clean on all 5 touched files; check-generator 68/68; dict-audit unchanged; NEW scripts/smoke-coach.sh browser E2E — finished a words-10 test with 3 injected mistakes, 4 notes rendered with headline+metric structure (screenshot scripts/coach-smoke.png).
+
+Stage Summary:
+- The coach now diagnoses each test from raw evidence instead of aggregates: it names the exact key that slipped against the test's own targets, prices the wpm lost to errors, timestamps error clusters ("4 err @ 19s"), separates stamina fade from cold opens and burst-stall rhythm, distinguishes dropped-letter vs overshoot signatures, merges this-test + lifetime confusion habits, flags this-run slow keys vs personal baseline, and celebrates measurable progress (PB deltas, near-misses, keys leaving the watch list, FSRS refresher queue). Idle preview now shows due-queue state. Notes cap at 4 with kind caps so the panel stays scannable.
+- Files: src/lib/typing/types.ts (CoachInsightKind + title/metric), src/lib/typing/insights.ts (full rewrite), src/app/page.tsx (events wiring), src/components/typing/results.tsx (note UI), src/lib/typing/profiles.ts (export personalMedianLatency). New: scripts/smoke-coach.sh; rewritten: scripts/check-insights.ts.

@@ -228,7 +228,7 @@ export function ingestEvents(learning: LearningData, events: CharEvent[], durati
 }
 
 /** Median observed inter-key latency across all tracked items (0 if none). */
-function personalMedianLatency(learning: LearningData): number {
+export function personalMedianLatency(learning: LearningData): number {
   const latencies: number[] = [];
   for (const p of Object.values(learning.keyProfiles)) {
     if (p.latency !== null) latencies.push(p.latency);

@@ -1,17 +1,31 @@
 "use client";
 
-import type { CoachInsight, TestResult } from "@/lib/typing/types";
+import type { CoachInsight, CoachInsightKind, TestResult } from "@/lib/typing/types";
 import { ResultChart } from "./result-chart";
-import { Flame, Target, TrendingUp, Gauge, Lightbulb, Award, Rocket } from "lucide-react";
+import {
+  Flame,
+  Target,
+  TrendingUp,
+  Gauge,
+  Lightbulb,
+  Award,
+  Rocket,
+  Crosshair,
+  Activity,
+  Sprout,
+} from "lucide-react";
 
-const KIND_ICON: Record<CoachInsight["kind"], React.ReactNode> = {
-  record: <Award className="h-4 w-4 text-hue" />,
+const KIND_ICON: Record<CoachInsightKind, React.ReactNode> = {
+  record: <Award className="text-hue h-4 w-4" />,
   accuracy: <Target className="h-4 w-4 text-[var(--warn)]" />,
-  focus: <TrendingUp className="h-4 w-4 text-hue" />,
-  speed: <Rocket className="h-4 w-4 text-hue" />,
-  trend: <Gauge className="h-4 w-4 text-hue" />,
+  focus: <TrendingUp className="text-hue h-4 w-4" />,
+  speed: <Rocket className="text-hue h-4 w-4" />,
+  trend: <Gauge className="text-hue h-4 w-4" />,
   tip: <Lightbulb className="h-4 w-4 text-[var(--warn)]" />,
   streak: <Flame className="h-4 w-4 text-[var(--warn)]" />,
+  error: <Crosshair className="h-4 w-4 text-[var(--warn)]" />,
+  rhythm: <Activity className="text-hue h-4 w-4" />,
+  recovery: <Sprout className="text-hue h-4 w-4" />,
 };
 
 interface ResultsProps {
@@ -66,18 +80,36 @@ export function Results({ result, insights }: ResultsProps) {
       {/* coach insights */}
       {insights.length > 0 && (
         <div className="mt-10 xl:mt-12">
-          <div className="text-dim mb-3 font-mono text-xs tracking-widest uppercase">
-            coach notes
+          <div className="mb-3 flex items-center gap-2.5">
+            <span className="text-dim font-mono text-xs tracking-widest uppercase">
+              coach notes
+            </span>
+            <span className="bg-hue/15 text-hue rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold">
+              {insights.length}
+            </span>
           </div>
           <ul className="space-y-2.5">
             {insights.map((ins, i) => (
               <li
                 key={i}
-                className="bg-surface flex items-start gap-3 rounded-lg border px-4 py-3 font-mono text-sm leading-relaxed xl:px-5 xl:text-[15px]"
+                className="bg-surface flex items-start gap-3 rounded-lg border px-4 py-3 xl:px-5"
                 style={{ borderColor: "#23252b" }}
               >
                 <span className="mt-0.5 shrink-0">{KIND_ICON[ins.kind]}</span>
-                <span className="text-sub">{ins.message}</span>
+                <div className="min-w-0 flex-1 font-mono text-sm leading-relaxed xl:text-[15px]">
+                  {ins.title && (
+                    <div className="text-foreground font-semibold">{ins.title}</div>
+                  )}
+                  <div className="text-sub">{ins.message}</div>
+                </div>
+                {ins.metric && (
+                  <span
+                    className="bg-elevated text-dim mt-0.5 shrink-0 rounded-md border px-2 py-1 font-mono text-[11px] whitespace-nowrap"
+                    style={{ borderColor: "#23252b" }}
+                  >
+                    {ins.metric}
+                  </span>
+                )}
               </li>
             ))}
           </ul>
