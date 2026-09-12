@@ -6,7 +6,7 @@
 import { generateInsights, nextTestPreview } from "../src/lib/typing/insights";
 import { emptyLearning } from "../src/lib/typing/profiles";
 import { newMemCard, reviewMem } from "../src/lib/typing/memory";
-import type { CharEvent, LearningData, Settings, StatsData, TestResult } from "../src/lib/typing/types";
+import type { CharEvent, LearningData, Settings, StatsData, TestResult, WordProfile } from "../src/lib/typing/types";
 import { DEFAULT_SETTINGS } from "../src/lib/typing/types";
 
 function profile(attempts: number, errRate: number, latency: number) {
@@ -193,6 +193,16 @@ for (let i = 0; i < 8; i++) {
   previewLearning.keyProfiles[k] = profile(60, 0.01, 150);
   if (previewLearning.keyProfiles[k].mem) previewLearning.keyProfiles[k].mem!.due = Date.now();
 }
+// due WORDS count into the same preview total (word-level FSRS layer)
+const dueWord = (): WordProfile => ({
+  attempts: 5,
+  errors: 1,
+  bestWpm: 64,
+  lastSeen: Date.now(),
+  mem: reviewMem(newMemCard(Date.now()), "good", Date.now()),
+});
+previewLearning.wordProfiles["quiet"] = dueWord();
+previewLearning.wordProfiles["onion"] = dueWord();
 console.log("\n=== idle preview (due queue) ===");
 console.log(nextTestPreview(previewLearning, "adaptive"));
 console.log(nextTestPreview(emptyLearning(), "adaptive"));
@@ -212,3 +222,10 @@ console.log("sloppy has speed/error-tax note:", kinds.includes("speed"));
 console.log("sloppy has accuracy note:", kinds.includes("accuracy"));
 console.log("sloppy has focus-slip note:", kinds.includes("focus") && s1.some((n) => n.message.includes("slipped 3")));
 console.log("sloppy has error-diagnosis or rhythm note:", kinds.includes("error") || kinds.includes("rhythm"));
+{
+  const withWords = nextTestPreview(previewLearning, "adaptive");
+  const noWords = nextTestPreview({ ...previewLearning, wordProfiles: {} }, "adaptive");
+  const nWith = Number(/plus (\d+) items due/.exec(withWords)?.[1] ?? -1);
+  const nWithout = Number(/plus (\d+) items due/.exec(noWords)?.[1] ?? -2);
+  console.log("preview due count includes words (+2):", nWith === nWithout + 2 && nWith > 0);
+}

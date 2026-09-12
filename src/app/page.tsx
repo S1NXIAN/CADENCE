@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WordDisplay } from "@/components/typing/word-display";
 import { Results } from "@/components/typing/results";
 import { StatsPanel } from "@/components/typing/stats-panel";
@@ -345,7 +345,13 @@ export default function Page() {
   }, [restartAll]);
 
   const done = session.status === "done" && resultForDisplay;
-  const coachLine = done || !settings.showCoach ? "" : nextTestPreview(learning, settings.mode);
+  // the preview only changes when the learning model or mode changes — memoized
+  // because page re-renders ~10x/s while running (timer ticks + live metrics)
+  // and the preview walks every key/bigram/word profile on each call
+  const coachLine = useMemo(
+    () => (done || !settings.showCoach ? "" : nextTestPreview(learning, settings.mode)),
+    [done, settings.showCoach, learning, settings.mode]
+  );
 
   if (!ready) {
     return (

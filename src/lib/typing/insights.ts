@@ -668,6 +668,11 @@ export function nextTestPreview(learning: LearningData, mode: string): string {
   for (const p of Object.values(learning.bigramProfiles)) {
     if (p.mem && p.mem.reps > 0 && p.mem.due <= horizon) due += 1;
   }
+  // the word layer feeds the same refresher queue (word-level FSRS) — the
+  // preview must count it or it under-reports what the next test will serve
+  for (const p of Object.values(learning.wordProfiles)) {
+    if (p.mem && p.mem.reps > 0 && p.mem.due <= horizon) due += 1;
+  }
 
   const parts: string[] = [];
   if (weak.length) parts.push(`keys ${weak.map((w) => `'${w.key}'`).join(", ")}`);

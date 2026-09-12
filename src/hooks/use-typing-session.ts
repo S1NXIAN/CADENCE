@@ -134,8 +134,7 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
       totalChars++;
     }
 
-    const now = startedAtRef.current ? performance.now() : 0;
-    const elapsedMs = startedAtRef.current ? now - startedAtRef.current : 0;
+    const elapsedMs = startedAtRef.current ? performance.now() - startedAtRef.current : 0;
     const minutes = Math.max(elapsedMs, 500) / 60000;
 
     const events = eventsRef.current;
