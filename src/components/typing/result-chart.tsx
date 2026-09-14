@@ -15,7 +15,9 @@ interface ResultChartProps {
 export function ResultChart({ samples, width = 640, height = 200, pbWpm }: ResultChartProps) {
   const padL = 44;
   const padR = 34;
-  const padT = 14;
+  /* top band holds the legend clear of the plot — the top gridline label and
+     the series legend used to collide on the same baseline */
+  const padT = 34;
   const padB = 26;
 
   const { wpmPath, rawPath, errPoints, sampleDots, yTicks, xTicks, pbY } = useMemo(() => {
@@ -97,20 +99,31 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
 
       {/* raw line */}
       <path d={rawPath} fill="none" stroke="var(--dim)" strokeWidth="1.5" opacity="0.65" />
-      {/* wpm line */}
-      <path d={wpmPath} fill="none" stroke="var(--hue)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+      {/* wpm line — draws once on mount, the coach replaying the run */}
+      <path
+        d={wpmPath}
+        fill="none"
+        stroke="var(--hue)"
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        pathLength={1}
+        className="chart-draw"
+      />
 
       {/* bare-sample dots for short runs (see sampleDots above) */}
-      {sampleDots.map((d, i) => (
-        <g key={i}>
-          <circle cx={d.rx} cy={d.ry} r="2.5" fill="var(--dim)" opacity="0.65" />
-          <circle cx={d.cx} cy={d.cy} r="3.5" fill="var(--hue)" />
-        </g>
-      ))}
+      <g className="chart-late">
+        {sampleDots.map((d, i) => (
+          <g key={i}>
+            <circle cx={d.rx} cy={d.ry} r="2.5" fill="var(--dim)" opacity="0.65" />
+            <circle cx={d.cx} cy={d.cy} r="3.5" fill="var(--hue)" />
+          </g>
+        ))}
+      </g>
 
       {/* personal-best reference line */}
       {pbY !== null && (
-        <g>
+        <g className="chart-late">
           <line
             x1={padL}
             x2={width - padR + 12}
@@ -135,25 +148,27 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
         </g>
       )}
 
-      {/* error markers */}
-      {errPoints.map((p, i) => (
-        <g key={i} stroke="var(--error)" strokeWidth="2" strokeLinecap="round">
-          <line x1={p.cx - 4} y1={p.cy - 4} x2={p.cx + 4} y2={p.cy + 4} />
-          <line x1={p.cx - 4} y1={p.cy + 4} x2={p.cx + 4} y2={p.cy - 4} />
-        </g>
-      ))}
+      {/* error markers — land after the pace ink settles */}
+      <g className="chart-late">
+        {errPoints.map((p, i) => (
+          <g key={i} stroke="var(--error)" strokeWidth="2" strokeLinecap="round">
+            <line x1={p.cx - 4} y1={p.cy - 4} x2={p.cx + 4} y2={p.cy + 4} />
+            <line x1={p.cx - 4} y1={p.cy + 4} x2={p.cx + 4} y2={p.cy - 4} />
+          </g>
+        ))}
+      </g>
 
-      {/* legend */}
+      {/* legend — own band above the plot */}
       <g fontFamily="var(--font-geist-mono), monospace" fontSize="11">
-        <line x1={padL + 4} y1={padT - 3} x2={padL + 20} y2={padT - 3} stroke="var(--hue)" strokeWidth="2.5" />
-        <text x={padL + 26} y={padT} fill="var(--sub)">wpm</text>
-        <line x1={padL + 66} y1={padT - 3} x2={padL + 82} y2={padT - 3} stroke="var(--dim)" strokeWidth="1.5" />
-        <text x={padL + 88} y={padT} fill="var(--sub)">raw</text>
+        <line x1={padL + 4} y1={9} x2={padL + 20} y2={9} stroke="var(--hue)" strokeWidth="2.5" />
+        <text x={padL + 26} y={13} fill="var(--sub)">wpm</text>
+        <line x1={padL + 66} y1={9} x2={padL + 82} y2={9} stroke="var(--dim)" strokeWidth="1.5" />
+        <text x={padL + 88} y={13} fill="var(--sub)">raw</text>
         <g stroke="var(--error)" strokeWidth="2" strokeLinecap="round">
-          <line x1={padL + 120} y1={padT - 6} x2={padL + 126} y2={padT} />
-          <line x1={padL + 120} y1={padT} x2={padL + 126} y2={padT - 6} />
+          <line x1={padL + 120} y1={6} x2={padL + 126} y2={12} />
+          <line x1={padL + 120} y1={12} x2={padL + 126} y2={6} />
         </g>
-        <text x={padL + 132} y={padT} fill="var(--sub)">errors</text>
+        <text x={padL + 132} y={13} fill="var(--sub)">errors</text>
       </g>
     </svg>
   );

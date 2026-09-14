@@ -12,6 +12,7 @@ import {
   WordsPanel,
 } from "./results-panels";
 import { ResultChart } from "./result-chart";
+import { useCountUp } from "@/hooks/use-count-up";
 import { Activity, Award, Crosshair, Flame, Gauge, Lightbulb, Rocket, Sprout, Target, TrendingUp } from "lucide-react";
 
 const KIND_ICON: Record<CoachInsightKind, React.ReactNode> = {
@@ -40,21 +41,24 @@ function hasComparison(c: AuditCompare): boolean {
 
 export function Results({ result, insights, audit }: ResultsProps) {
   const tax = result.rawWpm - result.wpm;
+  // the two hero gauges settle from zero — digits hold width via tabular-nums
+  const shownWpm = useCountUp(result.wpm);
+  const shownAcc = useCountUp(result.accuracy);
   return (
     <div className="animate-in fade-in duration-300">
       {/* hero: big numbers + chart + detail row */}
       <div className="grid gap-8 lg:grid-cols-[280px_1fr] xl:gap-12">
-        <div className="flex min-w-0 flex-row flex-wrap justify-between gap-x-6 gap-y-3 lg:flex-col lg:justify-start">
+        <div className="stagger flex min-w-0 flex-row flex-wrap justify-between gap-x-6 gap-y-3 lg:flex-col lg:justify-start">
           <div>
             <div className="text-dim font-mono text-xs tracking-widest uppercase">wpm</div>
             <div className="text-hue font-mono text-6xl font-bold tabular-nums lg:text-7xl xl:text-8xl">
-              {result.wpm}
+              {Math.round(shownWpm)}
             </div>
           </div>
           <div>
             <div className="text-dim font-mono text-xs tracking-widest uppercase">acc</div>
             <div className="font-mono text-4xl font-semibold tabular-nums lg:text-5xl xl:text-6xl">
-              {result.accuracy}%
+              {Number.isInteger(result.accuracy) ? Math.round(shownAcc) : shownAcc.toFixed(1)}%
             </div>
           </div>
           {result.isPersonalBest && (
@@ -69,7 +73,8 @@ export function Results({ result, insights, audit }: ResultsProps) {
           <div className="slim-scroll overflow-x-auto pb-1">
             <ResultChart samples={result.samples} height={190} pbWpm={audit?.compare.prevBestWpm ?? null} />
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 font-mono text-sm sm:grid-cols-4 xl:mt-6 xl:gap-x-10 xl:text-base">
+          {/* six metrics in three columns — two even rows, no orphan cells */}
+          <div className="stagger mt-4 grid grid-cols-2 gap-x-6 gap-y-2 font-mono text-sm sm:grid-cols-3 xl:mt-6 xl:gap-x-10 xl:text-base">
             <Detail
               label="test"
               value={audit ? `${result.modeLabel}·#${audit.compare.testNo}` : result.modeLabel}
@@ -107,7 +112,7 @@ export function Results({ result, insights, audit }: ResultsProps) {
             </span>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="stagger grid gap-3 sm:grid-cols-2">
             {audit.speed && <SpeedPanel speed={audit.speed} duration={result.duration} />}
             <ErrorPanel errors={audit.errors} />
             <KeysPanel keys={audit.keys} />
@@ -129,7 +134,7 @@ export function Results({ result, insights, audit }: ResultsProps) {
               {insights.length}
             </span>
           </div>
-          <ul className="space-y-2.5">
+          <ul className="stagger space-y-2.5">
             {insights.map((ins, i) => (
               <li
                 key={i}

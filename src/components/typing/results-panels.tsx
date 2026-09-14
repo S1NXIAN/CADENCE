@@ -374,7 +374,9 @@ export function WordsPanel({ words }: { words: AuditWords }) {
               key={`${w.word}-${i}`}
               className="bg-elevated rounded border px-2 py-1 font-mono text-[12px]"
             >
-              <span className="text-sub underline decoration-warn/60 decoration-wavy underline-offset-4">
+              {/* dotted, not wavy — a wavy line reads as browser spellcheck;
+                  dots read as measured fault marks, machine-precise */}
+              <span className="text-sub underline decoration-dotted decoration-warn/60 underline-offset-4">
                 {w.word}
               </span>
               <span className="text-warn ml-1.5 tabular-nums">×{w.errors}</span>

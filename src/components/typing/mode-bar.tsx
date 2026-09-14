@@ -87,7 +87,7 @@ export const SubOptions = memo(function SubOptions({
           <button
             key={t}
             onClick={() => onSelectTime(t)}
-            className={`transition-colors ${timeDuration === t ? "text-hue" : "text-faint hover:text-foreground"}`}
+            className={`transition-colors ${timeDuration === t ? "text-hue" : "text-dim hover:text-foreground"}`}
           >
             {t}
           </button>
@@ -97,7 +97,7 @@ export const SubOptions = memo(function SubOptions({
           <button
             key={c}
             onClick={() => onSelectWordCount(c)}
-            className={`transition-colors ${wordCount === c ? "text-hue" : "text-faint hover:text-foreground"}`}
+            className={`transition-colors ${wordCount === c ? "text-hue" : "text-dim hover:text-foreground"}`}
           >
             {c}
           </button>
@@ -107,20 +107,20 @@ export const SubOptions = memo(function SubOptions({
     <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 px-4 font-mono text-xs sm:gap-x-5">
       {lengthButtons}
       {mode === "quote" && (
-        <button onClick={onNextQuote} className="text-faint transition-colors hover:text-foreground">
+        <button onClick={onNextQuote} className="text-dim transition-colors hover:text-foreground">
           next quote
         </button>
       )}
       <GroupRule />
       <button
         onClick={onTogglePunctuation}
-        className={`inline-flex items-center gap-1 transition-colors ${hasPunctuation ? "text-hue" : "text-faint hover:text-foreground"}`}
+        className={`inline-flex items-center gap-1 transition-colors ${hasPunctuation ? "text-hue" : "text-dim hover:text-foreground"}`}
       >
         <AtSign className="h-3 w-3" /> punctuation
       </button>
       <button
         onClick={onToggleNumbers}
-        className={`inline-flex items-center gap-1 transition-colors ${hasNumbers ? "text-hue" : "text-faint hover:text-foreground"}`}
+        className={`inline-flex items-center gap-1 transition-colors ${hasNumbers ? "text-hue" : "text-dim hover:text-foreground"}`}
       >
         <Hash className="h-3 w-3" /> numbers
       </button>
@@ -129,7 +129,7 @@ export const SubOptions = memo(function SubOptions({
           <GroupRule />
           <button
             onClick={onOpenIntensity}
-            className="text-faint inline-flex items-center gap-1 transition-colors hover:text-foreground"
+            className="text-dim inline-flex items-center gap-1 transition-colors hover:text-foreground"
             title="adaptive intensity — click to adjust (or use the command menu)"
           >
             <Gauge className="h-3 w-3" /> focus {adaptiveIntensity}%
