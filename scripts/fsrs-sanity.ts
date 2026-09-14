@@ -73,7 +73,7 @@ check("retrievability decays", rNow > rLater && rLater > rMuchLater && rMuchLate
 // 2. Motor priors
 // ---------------------------------------------------------------------------
 console.log("\n== motor priors ==");
-const pQ = keyPrior("q"), pJ = keyPrior("j"), pE = keyPrior("e");
+const pQ = keyPrior("q"), pJ = keyPrior("j");
 check("pinky key harder than index key", pQ.err > pJ.err * 1.4, `q=${pQ.err.toFixed(3)} j=${pJ.err.toFixed(3)}`);
 check("pinky key slower than index key", pQ.lat > pJ.lat * 1.15, `q=${pQ.lat.toFixed(0)}ms j=${pJ.lat.toFixed(0)}ms`);
 const sfEd = classifyBigram("e", "d");   // same finger (left middle)

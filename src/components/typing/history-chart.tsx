@@ -15,7 +15,7 @@ export function HistoryChart({ history, height = 190 }: HistoryChartProps) {
     return [...history].slice(0, 100).reverse();
   }, [history]);
 
-  const { path, dots, yTicks, maxY, width } = useMemo(() => {
+  const { path, dots, yTicks, width } = useMemo(() => {
     const width = 720;
     const padL = 44;
     const padR = 14;
@@ -39,7 +39,7 @@ export function HistoryChart({ history, height = 190 }: HistoryChartProps) {
       title: `${d.modeLabel} — ${d.wpm} wpm, ${d.accuracy}%`,
     }));
     const yTicks = [0.5, 1].map((f) => ({ v: Math.round(maxY * f), y: y(maxY * f) }));
-    return { path, dots, yTicks, maxY, width };
+    return { path, dots, yTicks, width };
   }, [data, height]);
 
   if (data.length === 0) {

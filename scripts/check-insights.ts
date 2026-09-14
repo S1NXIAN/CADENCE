@@ -6,7 +6,7 @@
 import { generateInsights, nextTestPreview } from "../src/lib/typing/insights";
 import { createEmptyLearning } from "../src/lib/typing/profiles";
 import { newMemCard, reviewMem } from "../src/lib/typing/memory";
-import type { CharEvent, LearningData, Settings, StatsData, TestResult, WordProfile } from "../src/lib/typing/types";
+import type { CharEvent, StatsData, TestResult, WordProfile } from "../src/lib/typing/types";
 import { DEFAULT_SETTINGS } from "../src/lib/typing/types";
 
 function profile(attempts: number, errRate: number, latency: number) {

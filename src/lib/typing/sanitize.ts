@@ -185,7 +185,6 @@ export function sanitizeStats(raw: unknown): StatsData {
   // History entries are untrusted too: `{"wpm": 1e999}` parses as Infinity,
   // hand-edited fields can be negative/strings — every numeric field is
   // clamped and arrays truncated so charts/insights math can never see NaN.
-  const MAX_SAMPLES = 7200; // 2h at 1Hz
   const history = Array.isArray(p.history)
     ? p.history
         .filter(
@@ -208,6 +207,7 @@ export function sanitizeStats(raw: unknown): StatsData {
 
 function sanitizeHistoryEntry(src: TestResult): TestResult {
   const h = src as unknown as Record<string, unknown>;
+  const MAX_SAMPLES = 7200; // 2h at 1Hz
   const charsSrc: Record<string, unknown> = isPlainObject(h.chars) ? h.chars : {};
   const samples = Array.isArray(h.samples)
     ? h.samples
@@ -217,9 +217,9 @@ function sanitizeHistoryEntry(src: TestResult): TestResult {
             typeof (s as Partial<TestResult["samples"][number]>).second === "number" &&
             typeof (s as Partial<TestResult["samples"][number]>).wpm === "number"
         )
-        .slice(0, 7200)
+        .slice(0, MAX_SAMPLES)
         .map((s) => ({
-          second: Math.round(clampNum(s.second, 0, 7200, 0)),
+          second: Math.round(clampNum(s.second, 0, MAX_SAMPLES, 0)),
           wpm: clampNum(s.wpm, 0, 500, 0),
           raw: clampNum(s.raw, 0, 700, 0),
           errors: Math.round(clampNum(s.errors, 0, 1e6, 0)),

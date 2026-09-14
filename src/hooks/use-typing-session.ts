@@ -359,41 +359,26 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
   const handleBackspace = useCallback(
     (ctrl: boolean) => {
       if (statusRef.current === "done" || optsRef.current.settings.isStrict) return;
-      if (ctrl) {
-        if (inputRef.current.length > 0) {
-          inputRef.current = "";
-          setInput("");
-        } else if (typedWordsRef.current.length > 0) {
-          // pull back previous word
-          const prev = typedWordsRef.current[typedWordsRef.current.length - 1] ?? "";
-          typedWordsRef.current = typedWordsRef.current.slice(0, -1);
-          if (wordOutcomesRef.current.length > typedWordsRef.current.length) wordOutcomesRef.current.pop();
-          inputRef.current = prev;
-          // the re-opened word gets a FRESH attempt: new timing, new error count
-          wordStartRef.current = null;
-          wordErrRef.current = 0;
-          setTypedWords(typedWordsRef.current);
-          setInput(prev);
-        }
+      if (inputRef.current.length > 0) {
+        // trim within the current attempt; ctrl wipes it in one stroke
+        inputRef.current = ctrl ? "" : inputRef.current.slice(0, -1);
+        setInput(inputRef.current);
         return;
       }
-      if (inputRef.current.length > 0) {
-        inputRef.current = inputRef.current.slice(0, -1);
-        setInput(inputRef.current);
-      } else if (typedWordsRef.current.length > 0) {
-        const prev = typedWordsRef.current[typedWordsRef.current.length - 1] ?? "";
-        // only allow going back if the previous word was not perfect
-        const target = test.words[typedWordsRef.current.length - 1] ?? "";
-        if (prev !== target) {
-          typedWordsRef.current = typedWordsRef.current.slice(0, -1);
-          if (wordOutcomesRef.current.length > typedWordsRef.current.length) wordOutcomesRef.current.pop();
-          inputRef.current = prev;
-          wordStartRef.current = null;
-          wordErrRef.current = 0;
-          setTypedWords(typedWordsRef.current);
-          setInput(prev);
-        }
-      }
+      if (typedWordsRef.current.length === 0) return;
+      // nothing left in the current attempt — pull back the previous word,
+      // but only when it isn't perfect (ctrl+backspace always pulls back)
+      const prevIndex = typedWordsRef.current.length - 1;
+      const prev = typedWordsRef.current[prevIndex] ?? "";
+      if (!ctrl && prev === test.words[prevIndex]) return;
+      typedWordsRef.current = typedWordsRef.current.slice(0, -1);
+      if (wordOutcomesRef.current.length > typedWordsRef.current.length) wordOutcomesRef.current.pop();
+      inputRef.current = prev;
+      // the re-opened word gets a FRESH attempt: new timing, new error count
+      wordStartRef.current = null;
+      wordErrRef.current = 0;
+      setTypedWords(typedWordsRef.current);
+      setInput(prev);
     },
     [test]
   );

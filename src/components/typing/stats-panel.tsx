@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { memo, useMemo, useRef } from "react";
 import type { LearningData, StatsData } from "@/lib/typing/types";
 import { computeWeakKeys, collectTopConfusions, collectWeakBigrams } from "@/lib/typing/profiles";
 import { collectDueWords, collectFastestWords, collectWorstWords, type UrgentWord } from "@/lib/typing/word-scheduler";
@@ -27,7 +27,8 @@ interface StatsPanelProps {
   onReset: () => void;
 }
 
-export function StatsPanel({
+/** memoized — while closed it skips rendering entirely on every parent render */
+export const StatsPanel = memo(function StatsPanel({
   open,
   onClose,
   stats,
@@ -298,7 +299,7 @@ export function StatsPanel({
       </DialogContent>
     </Dialog>
   );
-}
+});
 
 function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
@@ -359,18 +360,18 @@ function timeAgo(ts: number): string {
 }
 
 function ResetButton({ onReset }: { onReset: () => void }) {
-  const armed = useRef(false);
+  const isArmed = useRef(false);
   const labelRef = useRef<HTMLSpanElement>(null);
   return (
     <button
       onClick={() => {
-        if (armed.current) {
+        if (isArmed.current) {
           onReset();
         } else {
-          armed.current = true;
+          isArmed.current = true;
           if (labelRef.current) labelRef.current.textContent = "click again to erase everything";
           window.setTimeout(() => {
-            armed.current = false;
+            isArmed.current = false;
             if (labelRef.current) labelRef.current.textContent = "reset all data";
           }, 3000);
         }

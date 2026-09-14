@@ -195,12 +195,12 @@ export default function Page() {
   }, [session.status, session.restart]);
 
   const restartAll = useCallback(() => {
-    session.restart();
+    sessionRef.current.restart();
     setResultForDisplay(null);
     setInsights([]);
     setAudit(null);
     bumpFocus();
-  }, [session.restart, bumpFocus]);
+  }, [bumpFocus]);
 
   // regenerate when test-shape settings change
   useEffect(() => {

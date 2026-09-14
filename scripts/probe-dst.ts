@@ -40,9 +40,7 @@ console.log("\n=== grid column math (replica of activity-heatmap.tsx) ===");
 
   let offMidnight = 0;
   let wrongKey = 0;
-  // calendar ground truth: walk Mondays with setDate from a known Monday
-  const truth = new Date(2025, 10, 3); // Mon Nov 3 2025; grid's last full week
-  // compute grid first Monday by calendar: truth minus (WEEKS-1-?) weeks
+  // compute grid first Monday by calendar: it must itself be a Monday at midnight
   // simpler: firstMonday should itself be a Monday at midnight
   check("firstMonday is midnight", firstMonday.getHours() === 0, String(firstMonday));
   check("firstMonday is a Monday", firstMonday.getDay() === 1, String(firstMonday));

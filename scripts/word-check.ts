@@ -17,7 +17,7 @@ import {
   normalizeWordKey, expectedWordMs, ingestWordOutcomes, finalizeWordReviews,
   calculateWordUrgencies, pickReviewWords, collectWorstWords, collectFastestWords, collectDueWords, MIN_REVIEW_URGENCY,
 } from "../src/lib/typing/word-scheduler";
-import { createEmptyLearning, ingestEvents, finalizeLearning } from "../src/lib/typing/profiles";
+import { createEmptyLearning } from "../src/lib/typing/profiles";
 import { exportData, importData } from "../src/lib/typing/storage";
 import { sanitizeLearning } from "../src/lib/typing/sanitize";
 import type { LearningData, WordOutcome } from "../src/lib/typing/types";

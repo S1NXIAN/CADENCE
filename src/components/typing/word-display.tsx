@@ -211,7 +211,7 @@ export const WordDisplay = memo(function WordDisplay({
         }
       }
     }
-  }, [wordIndex, input, words, status, from]);
+  }, [wordIndex, input, words, status, from, lineH]);
 
   // active line → vertical scroll of the word stream
   const activeLine = Math.round(caret.top / lineH);

@@ -18,7 +18,7 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
   const padT = 14;
   const padB = 26;
 
-  const { wpmPath, rawPath, errPoints, yTicks, xTicks, maxY, pbY } = useMemo(() => {
+  const { wpmPath, rawPath, errPoints, yTicks, xTicks, pbY } = useMemo(() => {
     if (samples.length === 0) {
       return { wpmPath: "", rawPath: "", errPoints: [], yTicks: [], xTicks: [], maxY: 50, pbY: null };
     }
@@ -53,7 +53,7 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
     const pbY =
       pbWpm != null && pbWpm > 0 && pbWpm <= maxY && pbWpm >= 10 ? y(pbWpm) : null;
 
-    return { wpmPath, rawPath, errPoints, yTicks, xTicks, maxY, pbY };
+    return { wpmPath, rawPath, errPoints, yTicks, xTicks, pbY };
   }, [samples, width, height, pbWpm]);
 
   if (samples.length === 0) {
