@@ -69,3 +69,8 @@ server.log
 /scripts/*.raw
 /scripts/*.txt
 /scripts/research-*.json
+
+# ── impeccable live mode runtime state (configs stay tracked) ──
+/.impeccable/live/sessions/
+/.impeccable/live/inject-journal.json
+/.impeccable/live/roots.json
