@@ -34,7 +34,7 @@ export const StageHud = memo(function StageHud({
 }: StageHudProps) {
   return (
     <div className="mb-4 flex h-8 items-end justify-between px-1 font-mono xl:mb-5 xl:h-10">
-      <div className="flex items-baseline gap-7 xl:gap-9">
+      <div className="flex items-baseline gap-4 xl:gap-5">
         {timeLeft !== null ? (
           <div className="text-hue text-3xl font-semibold tabular-nums xl:text-4xl" aria-label="seconds left">
             {timeLeft}
@@ -46,9 +46,11 @@ export const StageHud = memo(function StageHud({
         )}
         {isLiveWpmOn && status === "running" && (
           <>
+            <span aria-hidden className="bg-border hidden h-4 w-px self-center sm:block" />
             <div className="text-sub tabular-nums text-lg xl:text-2xl" aria-live="off">
               {liveWpm} <span className="text-dim text-xs xl:text-sm">wpm</span>
             </div>
+            <span aria-hidden className="bg-border hidden h-4 w-px self-center sm:block" />
             <div className="text-sub tabular-nums text-lg xl:text-2xl" aria-live="off">
               {liveAcc}% <span className="text-dim text-xs xl:text-sm">acc</span>
             </div>

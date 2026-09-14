@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { AlignLeft, AtSign, Hash, Quote, Timer, Zap } from "lucide-react";
+import { AlignLeft, AtSign, Gauge, Hash, Quote, Timer, Zap } from "lucide-react";
 import type { TestMode } from "@/lib/typing/types";
 
 const MODE_ICONS: Record<TestMode, React.ReactNode> = {
@@ -61,6 +61,11 @@ interface SubOptionsProps {
   onOpenIntensity: () => void;
 }
 
+/** hairline divider between option groups — console-style column separators */
+function GroupRule() {
+  return <span aria-hidden className="bg-border hidden h-3 w-px sm:block" />;
+}
+
 /** text toggles under the mode pills; memoized — re-renders only on real option changes */
 export const SubOptions = memo(function SubOptions({
   mode,
@@ -76,10 +81,9 @@ export const SubOptions = memo(function SubOptions({
   onNextQuote,
   onOpenIntensity,
 }: SubOptionsProps) {
-  return (
-    <div className="mt-2 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 px-4 font-mono text-xs">
-      {mode === "time" &&
-        TIME_DURATIONS.map((t) => (
+  const lengthButtons =
+    mode === "time"
+      ? TIME_DURATIONS.map((t) => (
           <button
             key={t}
             onClick={() => onSelectTime(t)}
@@ -87,8 +91,8 @@ export const SubOptions = memo(function SubOptions({
           >
             {t}
           </button>
-        ))}
-      {(mode === "words" || mode === "adaptive") &&
+        ))
+      : (mode === "words" || mode === "adaptive") &&
         WORD_COUNTS.map((c) => (
           <button
             key={c}
@@ -97,12 +101,17 @@ export const SubOptions = memo(function SubOptions({
           >
             {c}
           </button>
-        ))}
+        ));
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 px-4 font-mono text-xs sm:gap-x-5">
+      {lengthButtons}
       {mode === "quote" && (
         <button onClick={onNextQuote} className="text-faint transition-colors hover:text-foreground">
           next quote
         </button>
       )}
+      <GroupRule />
       <button
         onClick={onTogglePunctuation}
         className={`inline-flex items-center gap-1 transition-colors ${hasPunctuation ? "text-hue" : "text-faint hover:text-foreground"}`}
@@ -116,13 +125,16 @@ export const SubOptions = memo(function SubOptions({
         <Hash className="h-3 w-3" /> numbers
       </button>
       {mode === "adaptive" && (
-        <button
-          onClick={onOpenIntensity}
-          className="text-faint inline-flex items-center gap-1 transition-colors hover:text-foreground"
-          title="adaptive intensity — click to adjust (or use the command menu)"
-        >
-          focus {adaptiveIntensity}%
-        </button>
+        <>
+          <GroupRule />
+          <button
+            onClick={onOpenIntensity}
+            className="text-faint inline-flex items-center gap-1 transition-colors hover:text-foreground"
+            title="adaptive intensity — click to adjust (or use the command menu)"
+          >
+            <Gauge className="h-3 w-3" /> focus {adaptiveIntensity}%
+          </button>
+        </>
       )}
     </div>
   );

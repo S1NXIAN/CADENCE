@@ -18,9 +18,9 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
   const padT = 14;
   const padB = 26;
 
-  const { wpmPath, rawPath, errPoints, yTicks, xTicks, pbY } = useMemo(() => {
+  const { wpmPath, rawPath, errPoints, sampleDots, yTicks, xTicks, pbY } = useMemo(() => {
     if (samples.length === 0) {
-      return { wpmPath: "", rawPath: "", errPoints: [], yTicks: [], xTicks: [], maxY: 50, pbY: null };
+      return { wpmPath: "", rawPath: "", errPoints: [], sampleDots: [], yTicks: [], xTicks: [], maxY: 50, pbY: null };
     }
     const innerW = width - padL - padR;
     const innerH = height - padT - padB;
@@ -40,6 +40,12 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
     const errPoints = samples
       .filter((s) => s.errors > 0)
       .map((s) => ({ cx: x(s.second), cy: y(s.raw), count: s.errors }));
+    // short runs draw bare points — a one-segment path reads as a glitch,
+    // dots keep the plot honest without pretending to be a trend
+    const sampleDots =
+      samples.length <= 8
+        ? samples.map((s) => ({ cx: x(s.second), cy: y(s.wpm), rx: x(s.second), ry: y(s.raw) }))
+        : [];
 
     const yTicks = [0.25, 0.5, 0.75, 1].map((f) => ({
       v: Math.round(maxY * f),
@@ -53,13 +59,16 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
     const pbY =
       pbWpm != null && pbWpm > 0 && pbWpm <= maxY && pbWpm >= 10 ? y(pbWpm) : null;
 
-    return { wpmPath, rawPath, errPoints, yTicks, xTicks, pbY };
+    return { wpmPath, rawPath, errPoints, sampleDots, yTicks, xTicks, pbY };
   }, [samples, width, height, pbWpm]);
 
-  if (samples.length === 0) {
+  // under three one-second samples there is no rhythm to plot — say so
+  // instead of drawing axes around a ghost
+  if (samples.length < 3) {
     return (
-      <div className="text-dim flex h-40 items-center justify-center font-mono text-sm">
-        not enough data for a chart
+      <div className="text-dim bg-surface/40 flex h-40 flex-col items-center justify-center gap-1 rounded-lg border border-dashed font-mono text-sm">
+        <span>sample window too short to plot</span>
+        <span className="text-faint text-xs">run for 3+ seconds to see the pace curve</span>
       </div>
     );
   }
@@ -90,6 +99,14 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
       <path d={rawPath} fill="none" stroke="var(--dim)" strokeWidth="1.5" opacity="0.65" />
       {/* wpm line */}
       <path d={wpmPath} fill="none" stroke="var(--hue)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+
+      {/* bare-sample dots for short runs (see sampleDots above) */}
+      {sampleDots.map((d, i) => (
+        <g key={i}>
+          <circle cx={d.rx} cy={d.ry} r="2.5" fill="var(--dim)" opacity="0.65" />
+          <circle cx={d.cx} cy={d.cy} r="3.5" fill="var(--hue)" />
+        </g>
+      ))}
 
       {/* personal-best reference line */}
       {pbY !== null && (

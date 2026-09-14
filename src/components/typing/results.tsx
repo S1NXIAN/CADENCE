@@ -1,7 +1,7 @@
 "use client";
 
 import type { CoachInsight, CoachInsightKind, TestResult } from "@/lib/typing/types";
-import type { TestAudit } from "@/lib/typing/audit";
+import type { AuditCompare, TestAudit } from "@/lib/typing/audit";
 import {
   CompareStrip,
   Detail,
@@ -31,6 +31,11 @@ interface ResultsProps {
   result: TestResult;
   insights: CoachInsight[];
   audit?: TestAudit | null;
+}
+
+/** the strip needs at least one real comparison point besides the run number */
+function hasComparison(c: AuditCompare): boolean {
+  return c.prevBestWpm !== null || c.last10Wpm !== null || (c.last10Acc !== null && c.accDelta !== null);
 }
 
 export function Results({ result, insights, audit }: ResultsProps) {
@@ -65,7 +70,10 @@ export function Results({ result, insights, audit }: ResultsProps) {
             <ResultChart samples={result.samples} height={190} pbWpm={audit?.compare.prevBestWpm ?? null} />
           </div>
           <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 font-mono text-sm sm:grid-cols-4 xl:mt-6 xl:gap-x-10 xl:text-base">
-            <Detail label="test" value={result.modeLabel} />
+            <Detail
+              label="test"
+              value={audit ? `${result.modeLabel}·#${audit.compare.testNo}` : result.modeLabel}
+            />
             <Detail label="raw" value={String(result.rawWpm)} />
             <Detail
               label="error tax"
@@ -83,8 +91,9 @@ export function Results({ result, insights, audit }: ResultsProps) {
         </div>
       </div>
 
-      {/* comparison strip — this test vs your record */}
-      {audit && <CompareStrip compare={audit.compare} />}
+      {/* comparison strip — this test vs your record (only when there is
+          something to compare; a lone "test #1" chip reads as debris) */}
+      {audit && hasComparison(audit.compare) && <CompareStrip compare={audit.compare} />}
 
       {/* ---- test audit ---- */}
       {audit && (

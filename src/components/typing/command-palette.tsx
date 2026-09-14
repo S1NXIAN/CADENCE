@@ -53,7 +53,13 @@ export const CommandPalette = memo(function CommandPalette({ open, onOpenChange,
   };
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange} title="command menu" description="modes, training options, and app actions">
+    <CommandDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="command menu"
+      description="modes, training options, and app actions"
+      className="font-mono"
+    >
       <CommandInput placeholder="type a command or search…" />
       <CommandList className="slim-scroll">
         <CommandEmpty>no matching command</CommandEmpty>

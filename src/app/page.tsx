@@ -316,9 +316,18 @@ export default function Page() {
   );
 
   if (!ready) {
+    // instrument boot: the wordmark with a phosphor block caret waking up —
+    // same caret language as the stream, gone in a blink on real loads
     return (
       <div className="bg-background flex min-h-screen items-center justify-center">
-        <div className="text-dim animate-pulse font-mono text-sm">loading cadence…</div>
+        <div
+          className="font-mono text-lg font-bold tracking-tight"
+          role="status"
+          aria-label="loading cadence"
+        >
+          cadence
+          <span className="caret-blink bg-hue ml-2 inline-block h-4 w-2.5 translate-y-[3px]" />
+        </div>
       </div>
     );
   }
@@ -356,8 +365,9 @@ export default function Page() {
         onOpenIntensity={openSettings}
       />
 
-      {/* main stage */}
-      <main className="flex flex-1 flex-col items-center justify-center px-4 py-6 sm:px-8 xl:py-8">
+      {/* main stage — bottom padding outweighs top so the cluster settles
+          slightly above true center (optical centering, not geometric) */}
+      <main className="flex flex-1 flex-col items-center justify-center px-4 pb-14 pt-6 sm:px-8 xl:pb-24 xl:pt-8">
         <div className="w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
           {done ? (
             <Results

@@ -29,9 +29,6 @@ export function CompareStrip({ compare }: { compare: AuditCompare }) {
   };
   return (
     <div className="mt-5 flex flex-wrap items-center gap-2 font-mono text-xs">
-      <Chip>
-        test <span className="text-sub">#{compare.testNo}</span>
-      </Chip>
       {compare.prevBestWpm !== null && (
         <Chip>
           prev best <span className="text-sub tabular-nums">{compare.prevBestWpm}</span> wpm

@@ -22,13 +22,16 @@ export function ConnectionBadge() {
       title={info.title}
       aria-label={`connection: ${info.label}`}
     >
-      <info.icon className={`h-3.5 w-3.5 ${state.status === "loading" ? "animate-spin" : ""}`} />
+      <info.icon className={`h-3.5 w-3.5 ${info.iconCls} ${state.status === "loading" ? "animate-spin" : ""}`} />
       {info.label}
     </span>
   );
 }
 
-function describe(s: PackState): { icon: typeof Wifi; label: string; cls: string; title: string } {
+function describe(s: PackState): { icon: typeof Wifi; label: string; cls: string; iconCls: string; title: string } {
+  // "ready" stays a quiet data chip — the One Phosphor Rule keeps the accent
+  // rare, so the permanent header chip gets hairline chrome and hands the
+  // hue to its glyph alone; only a real problem (sync failed) earns amber ink
   const base = "bg-elevated";
   switch (s.status) {
     case "ready": {
@@ -36,14 +39,16 @@ function describe(s: PackState): { icon: typeof Wifi; label: string; cls: string
         return {
           icon: WifiOff,
           label: `full potential · ${s.extraWords.toLocaleString()} words cached`,
-          cls: `text-hue border-hue/30 ${base}`,
+          cls: `text-dim border-border ${base}`,
+          iconCls: "text-hue",
           title: "Offline, but your cached word packs are active. Everything stays local.",
         };
       }
       return {
         icon: RadioTower,
         label: `full potential · +${s.extraWords.toLocaleString()} words`,
-        cls: `text-hue border-hue/30 ${base}`,
+        cls: `text-dim border-border ${base}`,
+        iconCls: "text-hue",
         title: "Online — extended word & quote packs are active (cached locally for offline use).",
       };
     }
@@ -51,7 +56,8 @@ function describe(s: PackState): { icon: typeof Wifi; label: string; cls: string
       return {
         icon: LoaderCircle,
         label: "syncing packs…",
-        cls: `text-dim border-hue/20 ${base}`,
+        cls: `text-dim border-border ${base}`,
+        iconCls: "text-dim",
         title: "Fetching the extended word/quote packs…",
       };
     case "error":
@@ -59,6 +65,7 @@ function describe(s: PackState): { icon: typeof Wifi; label: string; cls: string
         icon: Wifi,
         label: "pack sync failed",
         cls: `text-warn border-border ${base}`,
+        iconCls: "text-warn",
         title: "Couldn't download the extra word packs. The local core is unaffected — try again later.",
       };
     case "off":
@@ -66,11 +73,12 @@ function describe(s: PackState): { icon: typeof Wifi; label: string; cls: string
         icon: WifiOff,
         label: "local core",
         cls: `text-dim border-border ${base}`,
+        iconCls: "text-dim",
         title: "Online packs disabled — running on the built-in dictionary.",
       };
     default:
       return s.online
-        ? { icon: Wifi, label: "local core", cls: `text-dim border-border ${base}`, title: "Online — the engine runs 100% locally." }
-        : { icon: WifiOff, label: "local core", cls: `text-dim border-border ${base}`, title: "Offline — the engine runs 100% locally." };
+        ? { icon: Wifi, label: "local core", cls: `text-dim border-border ${base}`, iconCls: "text-dim", title: "Online — the engine runs 100% locally." }
+        : { icon: WifiOff, label: "local core", cls: `text-dim border-border ${base}`, iconCls: "text-dim", title: "Offline — the engine runs 100% locally." };
   }
 }
