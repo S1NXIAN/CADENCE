@@ -11,7 +11,7 @@ interface ResultChartProps {
   pbWpm?: number | null;
 }
 
-/** SVG chart of wpm / raw over time with error markers — MonkeyType style. */
+/** SVG chart of wpm / raw over time with error markers. */
 export function ResultChart({ samples, width = 640, height = 200, pbWpm }: ResultChartProps) {
   const padL = 44;
   const padR = 34;
@@ -67,7 +67,7 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      className="w-full"
+      className="w-full min-w-[640px]"
       role="img"
       aria-label="words per minute over time"
     >
@@ -87,7 +87,7 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
       ))}
 
       {/* raw line */}
-      <path d={rawPath} fill="none" stroke="var(--dim)" strokeWidth="1.5" strokeDasharray="1 0" opacity="0.65" />
+      <path d={rawPath} fill="none" stroke="var(--dim)" strokeWidth="1.5" opacity="0.65" />
       {/* wpm line */}
       <path d={wpmPath} fill="none" stroke="var(--hue)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
 
@@ -96,7 +96,7 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
         <g>
           <line
             x1={padL}
-            x2={width - padR + 20}
+            x2={width - padR + 12}
             y1={pbY}
             y2={pbY}
             stroke="var(--hue-dim)"
@@ -106,8 +106,9 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
             <title>previous personal best</title>
           </line>
           <text
-            x={width - padR + 24}
+            x={width - 2}
             y={pbY + 4}
+            textAnchor="end"
             fontSize="11"
             fill="var(--sub)"
             fontFamily="var(--font-geist-mono), monospace"

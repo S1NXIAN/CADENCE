@@ -50,13 +50,15 @@ export function KeyHeatmap({ learning }: { learning: LearningData }) {
 
   return (
     <div>
-      <div className="mb-4 flex items-center gap-1 rounded-lg border p-1 font-mono text-xs" style={{ borderColor: "var(--border)" }}>
+      <div className="mb-4 flex items-center gap-1 rounded-lg border p-1 font-mono text-xs">
         {(["speed", "errors"] as HeatMode[]).map((m) => (
           <button
             key={m}
             onClick={() => setMode(m)}
-            className={`rounded px-3 py-1.5 transition-colors ${
-              mode === m ? "bg-hue text-primary-foreground font-semibold" : "text-dim hover:text-foreground"
+            className={`rounded-md px-3 py-1.5 transition-colors ${
+              mode === m
+                ? "border border-hue/30 bg-hue/15 font-semibold text-hue"
+                : "border border-transparent text-dim hover:text-foreground"
             }`}
           >
             {m === "speed" ? "slower keys" : "error keys"}
@@ -74,7 +76,6 @@ export function KeyHeatmap({ learning }: { learning: LearningData }) {
                 className="flex h-11 w-11 cursor-default items-center justify-center rounded-md border font-mono text-sm font-medium transition-colors sm:h-12 sm:w-12"
                 style={{
                   backgroundColor: colorFor(key),
-                  borderColor: "var(--border)",
                   color: colorFor(key) === "#1c1e23" ? "var(--dim)" : "var(--foreground)",
                 }}
               >

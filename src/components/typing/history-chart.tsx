@@ -51,7 +51,7 @@ export function HistoryChart({ history, height = 190 }: HistoryChartProps) {
   }
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full" role="img" aria-label="wpm history">
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[720px]" role="img" aria-label="wpm history">
       {yTicks.map((t) => (
         <g key={t.v}>
           <line x1={44} x2={width - 14} y1={t.y} y2={t.y} stroke="var(--border)" />

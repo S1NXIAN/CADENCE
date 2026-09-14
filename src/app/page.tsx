@@ -24,7 +24,7 @@ import {
 } from "@/lib/typing/storage";
 import type { CharEvent, CoachInsight, LearningData, Settings, StatsData, TestResult, WordOutcome } from "@/lib/typing/types";
 import { ACCENT_COLORS, DEFAULT_SETTINGS } from "@/lib/typing/types";
-import { Zap, Timer, AlignLeft, Quote, AtSign, Hash, BarChart3, Settings as SettingsIcon, Waves, Keyboard } from "lucide-react";
+import { Zap, Timer, AlignLeft, Quote, AtSign, Hash, BarChart3, Settings as SettingsIcon, Waves, Keyboard, Flame } from "lucide-react";
 
 const MODE_ICONS = {
   adaptive: <Zap className="h-3.5 w-3.5" />,
@@ -123,8 +123,13 @@ export default function Page() {
   useEffect(() => {
     if (typeof document === "undefined") return;
     const hue = ACCENT_COLORS[settings.accent]?.hue ?? ACCENT_COLORS.lime.hue;
-    document.documentElement.style.setProperty("--hue", hue);
-    document.documentElement.style.setProperty("--hue-dim", `${hue}99`);
+    const root = document.documentElement;
+    root.style.setProperty("--hue", hue);
+    root.style.setProperty("--hue-dim", `${hue}99`);
+    // mirror the accent into the shadcn primary/ring roles so slider, switch,
+    // tooltip and focus rings follow the one living hue (One Phosphor Rule)
+    root.style.setProperty("--primary", hue);
+    root.style.setProperty("--ring", `${hue}66`);
   }, [settings.accent, ready]);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -399,11 +404,11 @@ export default function Page() {
           {stats.streakDays > 0 && (
             <span
               className="text-sub bg-elevated hidden items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-mono text-xs sm:inline-flex"
-              style={{ borderColor: "var(--border)" }}
               aria-label={`${stats.streakDays}-day streak`}
               title={`${stats.streakDays}-day streak`}
             >
-              <span aria-hidden>🔥</span> {stats.streakDays}d
+              <Flame className="text-warn h-3.5 w-3.5" aria-hidden />
+              {stats.streakDays}d
             </span>
           )}
           <button
@@ -487,9 +492,13 @@ export default function Page() {
           <Hash className="h-3 w-3" /> numbers
         </button>
         {settings.mode === "adaptive" && (
-          <span className="text-faint" title="share of the test aimed at your weakest keys">
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="text-faint inline-flex items-center gap-1 transition-colors hover:text-foreground"
+            title="adaptive intensity — click to adjust (or use the command menu)"
+          >
             focus {settings.adaptiveIntensity}%
-          </span>
+          </button>
         )}
       </div>
 
@@ -538,12 +547,12 @@ export default function Page() {
       <footer className="text-dim mt-auto flex flex-wrap items-center justify-between gap-2 px-5 pb-5 font-mono text-xs sm:px-8">
         <div className="flex items-center gap-4">
           <span>
-            <kbd className="bg-elevated rounded border px-1.5 py-0.5" style={{ borderColor: "var(--border)" }}>tab</kbd> restart test
+            <kbd className="bg-elevated rounded border px-1.5 py-0.5">tab</kbd> restart test
           </span>
           <span>
-            <kbd className="bg-elevated rounded border px-1.5 py-0.5" style={{ borderColor: "var(--border)" }}>esc</kbd> menu
+            <kbd className="bg-elevated rounded border px-1.5 py-0.5">esc</kbd> menu
           </span>
-          {settings.strictMode && <span className="text-[var(--warn)]">strict mode — no backspace</span>}
+          {settings.strictMode && <span className="text-warn">strict mode — no backspace</span>}
         </div>
         <div className="flex items-center gap-1.5">
           <span className="dot-breathe bg-hue/20 inline-block h-1.5 w-1.5 rounded-full" />

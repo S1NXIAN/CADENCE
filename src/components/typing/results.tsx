@@ -20,18 +20,16 @@ import {
 
 const KIND_ICON: Record<CoachInsightKind, React.ReactNode> = {
   record: <Award className="text-hue h-4 w-4" />,
-  accuracy: <Target className="h-4 w-4 text-[var(--warn)]" />,
+  accuracy: <Target className="text-warn h-4 w-4" />,
   focus: <TrendingUp className="text-hue h-4 w-4" />,
   speed: <Rocket className="text-hue h-4 w-4" />,
   trend: <Gauge className="text-hue h-4 w-4" />,
-  tip: <Lightbulb className="h-4 w-4 text-[var(--warn)]" />,
-  streak: <Flame className="h-4 w-4 text-[var(--warn)]" />,
-  error: <Crosshair className="h-4 w-4 text-[var(--warn)]" />,
+  tip: <Lightbulb className="text-warn h-4 w-4" />,
+  streak: <Flame className="text-warn h-4 w-4" />,
+  error: <Crosshair className="text-warn h-4 w-4" />,
   rhythm: <Activity className="text-hue h-4 w-4" />,
   recovery: <Sprout className="text-hue h-4 w-4" />,
 };
-
-const BORDER = "var(--border)";
 
 interface ResultsProps {
   result: TestResult;
@@ -45,7 +43,7 @@ export function Results({ result, insights, audit }: ResultsProps) {
     <div className="animate-in fade-in duration-300">
       {/* hero: big numbers + chart + detail row */}
       <div className="grid gap-8 lg:grid-cols-[280px_1fr] xl:gap-12">
-        <div className="flex flex-row justify-between gap-6 lg:flex-col lg:justify-start">
+        <div className="flex min-w-0 flex-row flex-wrap justify-between gap-x-6 gap-y-3 lg:flex-col lg:justify-start">
           <div>
             <div className="text-dim font-mono text-xs tracking-widest uppercase">wpm</div>
             <div className="text-hue font-mono text-6xl font-bold tabular-nums lg:text-7xl xl:text-8xl">
@@ -59,15 +57,17 @@ export function Results({ result, insights, audit }: ResultsProps) {
             </div>
           </div>
           {result.isPersonalBest && (
-            <div className="text-hue inline-flex items-center gap-2 rounded-md border border-hue/30 bg-hue/10 px-3 py-1.5 font-mono text-xs">
+            <div className="text-hue inline-flex w-full items-center justify-center gap-2 self-start rounded-md border border-hue/30 bg-hue/10 px-3 py-1.5 font-mono text-xs sm:w-auto sm:justify-start">
               <Award className="h-3.5 w-3.5" />
               new personal best · {result.modeLabel}
             </div>
           )}
         </div>
 
-        <div>
-          <ResultChart samples={result.samples} height={190} pbWpm={audit?.compare.prevBestWpm ?? null} />
+        <div className="min-w-0">
+          <div className="slim-scroll overflow-x-auto pb-1">
+            <ResultChart samples={result.samples} height={190} pbWpm={audit?.compare.prevBestWpm ?? null} />
+          </div>
           <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 font-mono text-sm sm:grid-cols-4 xl:mt-6 xl:gap-x-10 xl:text-base">
             <Detail label="test" value={result.modeLabel} />
             <Detail label="raw" value={String(result.rawWpm)} />
@@ -129,7 +129,6 @@ export function Results({ result, insights, audit }: ResultsProps) {
               <li
                 key={i}
                 className="bg-surface flex items-start gap-3 rounded-lg border px-4 py-3 xl:px-5"
-                style={{ borderColor: BORDER }}
               >
                 <span className="mt-0.5 shrink-0">{KIND_ICON[ins.kind]}</span>
                 <div className="min-w-0 flex-1 font-mono text-sm leading-relaxed xl:text-[15px]">
@@ -141,7 +140,6 @@ export function Results({ result, insights, audit }: ResultsProps) {
                 {ins.metric && (
                   <span
                     className="bg-elevated text-dim mt-0.5 shrink-0 rounded-md border px-2 py-1 font-mono text-[11px] whitespace-nowrap"
-                    style={{ borderColor: BORDER }}
                   >
                     {ins.metric}
                   </span>
@@ -164,7 +162,7 @@ function CompareStrip({ compare }: { compare: AuditCompare }) {
     if (d === null || d === 0) return <span className="text-dim">±0</span>;
     const good = d > 0;
     return (
-      <span className={good ? "text-hue" : "text-[var(--warn)]"}>
+      <span className={good ? "text-hue" : "text-warn"}>
         {good ? "+" : ""}
         {d}
       </span>
@@ -199,10 +197,7 @@ function CompareStrip({ compare }: { compare: AuditCompare }) {
 
 function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span
-      className="bg-surface inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5"
-      style={{ borderColor: BORDER }}
-    >
+    <span className="bg-surface inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5">
       {children}
     </span>
   );
@@ -222,7 +217,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-surface rounded-lg border p-4 xl:p-5" style={{ borderColor: BORDER }}>
+    <div className="bg-surface rounded-lg border p-4 xl:p-5">
       <div className="text-dim mb-3.5 flex items-center gap-2 font-mono text-[11px] tracking-widest uppercase">
         {icon}
         <span>{title}</span>
@@ -244,12 +239,12 @@ function SpeedPanel({ speed, duration }: { speed: AuditSpeed; duration: number }
       </div>
       <div className="text-faint mt-3 space-y-1 font-mono text-[11px] leading-relaxed">
         {speed.fade >= 0.15 && (
-          <div className="text-[var(--warn)]">
+          <div className="text-warn">
             faded to {Math.round((1 - speed.fade) * 100)}% of opening pace by the end
           </div>
         )}
         {speed.warmup >= 0.35 && (
-          <div className="text-[var(--warn)]">
+          <div className="text-warn">
             cold open — the first seconds ran {Math.round(speed.warmup * 100)}% under sustained pace
           </div>
         )}
@@ -283,7 +278,7 @@ function SpeedRow({
           <span className="text-faint ml-1 text-[11px]">wpm</span>
         </span>
       </div>
-      <div className="mt-1 h-1 rounded-full" style={{ background: BORDER }}>
+      <div className="mt-1 h-1 rounded-full" style={{ background: "var(--border)" }}>
         <div className="h-1 rounded-full" style={{ width: `${pct}%`, background: color }} />
       </div>
     </div>
@@ -292,14 +287,16 @@ function SpeedRow({
 
 function ErrorPanel({ errors }: { errors: AuditErrors }) {
   const total = errors.correct + errors.incorrect + errors.extra + errors.missed;
-  const seg = (v: number) => (total > 0 ? v : 0);
+  // segments are %-of-every-character so the hairline bed stays visible as
+  // the "ok" share — a lone extra char must not read as a full bar of doom
+  const seg = (v: number) => (total > 0 ? (v / total) * 100 : 0);
   return (
-    <Panel icon={<Crosshair className="h-3.5 w-3.5 text-[var(--warn)]" />} title="error autopsy">
+    <Panel icon={<Crosshair className="text-warn h-3.5 w-3.5" />} title="error autopsy">
       {/* character fate bar: dark = ok, red = wrong, amber = extra, violet = missed */}
-      <div className="flex h-2 overflow-hidden rounded-full" style={{ background: BORDER }}>
-        <div style={{ flexGrow: seg(errors.incorrect), background: "var(--error)" }} />
-        <div style={{ flexGrow: seg(errors.extra), background: "var(--warn)" }} />
-        <div style={{ flexGrow: seg(errors.missed), background: "var(--chart-6)" }} />
+      <div className="flex h-2 overflow-hidden rounded-full" style={{ background: "var(--border)" }}>
+        <div style={{ width: `${seg(errors.incorrect)}%`, background: "var(--error)" }} />
+        <div style={{ width: `${seg(errors.extra)}%`, background: "var(--warn)" }} />
+        <div style={{ width: `${seg(errors.missed)}%`, background: "var(--chart-6)" }} />
       </div>
       <div className="text-sub mt-2.5 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px]">
         <span>
@@ -331,10 +328,13 @@ function ErrorPanel({ errors }: { errors: AuditErrors }) {
         {errors.worstWindow && (
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-dim">worst stretch</span>
-            <span className="text-[var(--warn)] tabular-nums">
+            <span className="text-warn tabular-nums">
               {errors.worstWindow.count} err @ {errors.worstWindow.start}s
             </span>
           </div>
+        )}
+        {errors.bad === 0 && (
+          <div className="text-faint">a spotless run — nothing to autopsy</div>
         )}
       </div>
 
@@ -348,11 +348,10 @@ function ErrorPanel({ errors }: { errors: AuditErrors }) {
               <span
                 key={`${c.expected}>${c.typed}`}
                 className="bg-elevated rounded border px-1.5 py-0.5 font-mono text-[11px]"
-                style={{ borderColor: BORDER }}
               >
                 <span className="text-sub">{c.expected}</span>
                 <span className="text-faint">→</span>
-                <span className="text-[var(--warn)]">{c.typed}</span>
+                <span className="text-err">{c.typed}</span>
                 <span className="text-dim ml-1 tabular-nums">×{c.count}</span>
               </span>
             ))}
@@ -375,17 +374,14 @@ function KeysPanel({ keys }: { keys: AuditKeys }) {
             {keys.focus.map((k) => (
               <div key={k.key} className="flex items-center justify-between gap-3 font-mono text-[13px]">
                 <span className="flex items-center gap-2">
-                  <kbd
-                    className="bg-elevated text-sub rounded border px-1.5 py-0.5 text-xs"
-                    style={{ borderColor: BORDER }}
-                  >
+                  <kbd className="bg-elevated text-sub rounded border px-1.5 py-0.5 text-xs">
                     {k.key}
                   </kbd>
                   <span className="text-faint text-[11px]">{k.attempts}× </span>
                 </span>
                 <span className="tabular-nums">
                   {k.errors > 0 ? (
-                    <span className="text-[var(--warn)]">
+                    <span className="text-warn">
                       {k.errors} slip{k.errors > 1 ? "s" : ""}
                     </span>
                   ) : (
@@ -409,11 +405,10 @@ function KeysPanel({ keys }: { keys: AuditKeys }) {
               <span
                 key={k.key}
                 className="bg-elevated rounded border px-1.5 py-0.5 font-mono text-[11px]"
-                style={{ borderColor: BORDER }}
               >
                 <span className="text-sub">'{k.key}'</span>{" "}
                 <span className="tabular-nums">{k.ms}ms</span>{" "}
-                <span className="text-[var(--warn)]">+{k.over}%</span>
+                <span className="text-warn">+{k.over}%</span>
               </span>
             ))}
           </div>
@@ -430,7 +425,6 @@ function KeysPanel({ keys }: { keys: AuditKeys }) {
               <span
                 key={k.key}
                 className="bg-elevated rounded border px-1.5 py-0.5 font-mono text-[11px]"
-                style={{ borderColor: BORDER }}
               >
                 <span className="text-sub">'{k.key}'</span>{" "}
                 <span className="text-hue tabular-nums">{k.ms}ms</span>
@@ -440,7 +434,7 @@ function KeysPanel({ keys }: { keys: AuditKeys }) {
         </div>
       )}
 
-      {keys.focus.length === 0 && keys.slowest.length === 0 && (
+      {keys.focus.length === 0 && keys.slowest.length === 0 && keys.fastest.length === 0 && (
         <div className="text-faint font-mono text-[12px]">
           even pace across the board — no key stood out this run
         </div>
@@ -459,7 +453,7 @@ function RhythmPanel({ rhythm, speed }: { rhythm: AuditRhythm; speed: AuditSpeed
         <span className="text-dim font-mono text-sm">%</span>
         <span className="text-faint ml-1 font-mono text-[11px]">consistency</span>
       </div>
-      <div className="mt-2 h-1 rounded-full" style={{ background: BORDER }}>
+      <div className="mt-2 h-1 rounded-full" style={{ background: "var(--border)" }}>
         <div
           className="h-1 rounded-full"
           style={{
@@ -478,7 +472,7 @@ function RhythmPanel({ rhythm, speed }: { rhythm: AuditRhythm; speed: AuditSpeed
               <>
                 {" "}
                 — longest{" "}
-                <span className="text-[var(--warn)] tabular-nums">
+                <span className="text-warn tabular-nums">
                   {(rhythm.longestFreezeMs / 1000).toFixed(1)}s
                 </span>
                 {rhythm.freezeBefore && (
@@ -506,10 +500,7 @@ function RhythmPanel({ rhythm, speed }: { rhythm: AuditRhythm; speed: AuditSpeed
 
 function WordsPanel({ words }: { words: AuditWords }) {
   return (
-    <div
-      className="bg-surface mt-3 rounded-lg border p-4 xl:p-5"
-      style={{ borderColor: BORDER }}
-    >
+    <div className="bg-surface mt-3 rounded-lg border p-4 xl:p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="text-dim flex items-center gap-2 font-mono text-[11px] tracking-widest uppercase">
           <TypeIcon className="text-hue h-3.5 w-3.5" />
@@ -526,13 +517,12 @@ function WordsPanel({ words }: { words: AuditWords }) {
             <span
               key={`${w.word}-${i}`}
               className="bg-elevated rounded border px-2 py-1 font-mono text-[12px]"
-              style={{ borderColor: BORDER }}
             >
               <span className="text-sub underline decoration-warn/60 decoration-wavy underline-offset-4">
                 {w.word}
               </span>
-              <span className="text-[var(--warn)] ml-1.5 tabular-nums">×{w.errors}</span>
-              {w.missed > 0 && <span className="text-faint ml-1 text-[11px]">{w.missed} missed</span>}
+              <span className="text-warn ml-1.5 tabular-nums">×{w.errors}</span>
+              {w.missed > 0 && <span className="text-faint ml-1 text-[11px]">· {w.missed} missed</span>}
             </span>
           ))}
         </div>
@@ -565,7 +555,7 @@ function Detail({
       <div
         className={
           tone === "warn"
-            ? "text-[var(--warn)] tabular-nums"
+            ? "text-warn tabular-nums"
             : muted
               ? "text-faint text-xs"
               : "text-sub tabular-nums"

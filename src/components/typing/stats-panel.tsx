@@ -8,6 +8,13 @@ import { KeyHeatmap } from "./key-heatmap";
 import { HistoryChart } from "./history-chart";
 import { ActivityHeatmap } from "./activity-heatmap";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { X, Download, Upload, Trash2, Keyboard, Flame, Clock, Gauge, Target, TriangleAlert, Zap, CalendarClock } from "lucide-react";
 
 interface StatsPanelProps {
@@ -57,28 +64,24 @@ export function StatsPanel({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:p-8">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="stats-panel-title"
-        className="bg-surface slim-scroll my-auto w-full max-w-4xl rounded-2xl border p-6 shadow-2xl sm:p-8"
-        style={{ borderColor: "var(--border)" }}
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="bg-surface slim-scroll flex max-h-[85dvh] flex-col gap-0 overflow-y-auto rounded-2xl p-6 shadow-2xl sm:max-w-4xl sm:p-8"
       >
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h2 id="stats-panel-title" className="font-mono text-xl font-semibold">your progress</h2>
-            <p className="text-dim mt-1 font-mono text-xs">
+            <DialogTitle className="font-mono text-xl font-semibold">your progress</DialogTitle>
+            <DialogDescription className="text-dim mt-1 font-mono text-xs">
               {learning.totalKeystrokes.toLocaleString()} keystrokes studied · everything stored locally
-            </p>
+            </DialogDescription>
           </div>
-          <button
-            onClick={onClose}
-            className="text-dim hover:text-foreground rounded-lg p-2 transition-colors"
+          <DialogClose
+            className="text-dim hover:text-foreground hover:bg-elevated rounded-md p-2 transition-colors"
             aria-label="close stats"
           >
             <X className="h-5 w-5" />
-          </button>
+          </DialogClose>
         </div>
 
         {/* summary cards */}
@@ -105,7 +108,9 @@ export function StatsPanel({
             </div>
             <div>
               <SectionTitle>wpm progression</SectionTitle>
-              <HistoryChart history={stats.history} />
+              <div className="slim-scroll overflow-x-auto pb-1">
+                <HistoryChart history={stats.history} />
+              </div>
             </div>
             {weak.length > 0 && (
               <div>
@@ -115,7 +120,6 @@ export function StatsPanel({
                     <span
                       key={w.key}
                       className="bg-elevated inline-flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-sm"
-                      style={{ borderColor: "var(--border)" }}
                     >
                       <Keyboard className="text-hue h-3.5 w-3.5" />
                       {w.key}
@@ -137,7 +141,7 @@ export function StatsPanel({
                 <SectionTitle>trickiest key transitions (errors & slow combos)</SectionTitle>
                 <div className="flex flex-wrap gap-2">
                   {bgs.map((b) => (
-                    <span key={b.bigram} className="bg-elevated inline-flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-sm" style={{ borderColor: "var(--border)" }}>
+                    <span key={b.bigram} className="bg-elevated inline-flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-sm">
                       {b.bigram}
                       <span className="text-dim text-xs">
                         {(b.errRate * 100).toFixed(1)}% err
@@ -153,7 +157,7 @@ export function StatsPanel({
                 <SectionTitle>finger confusions (meant → typed)</SectionTitle>
                 <div className="flex flex-wrap gap-2">
                   {confusions.map((c) => (
-                    <span key={`${c.expected}-${c.typed}`} className="bg-elevated inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-mono text-sm" style={{ borderColor: "var(--border)" }}>
+                    <span key={`${c.expected}-${c.typed}`} className="bg-elevated inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-mono text-sm">
                       <span className="text-sub">{c.expected}</span>
                       <span className="text-dim">→</span>
                       <span className="text-err">{c.typed}</span>
@@ -218,7 +222,7 @@ export function StatsPanel({
                 no tests yet — finish one and it lands here
               </div>
             ) : (
-              <div className="slim-scroll max-h-[380px] overflow-y-auto rounded-lg border" style={{ borderColor: "var(--border)" }}>
+              <div className="slim-scroll max-h-[380px] overflow-y-auto rounded-lg border">
                 <table className="w-full font-mono text-sm">
                   <thead className="bg-elevated sticky top-0">
                     <tr className="text-dim text-left text-xs tracking-wider uppercase">
@@ -232,7 +236,7 @@ export function StatsPanel({
                   </thead>
                   <tbody>
                     {stats.history.slice(0, 100).map((h) => (
-                      <tr key={h.id} className="border-t" style={{ borderColor: "var(--secondary)" }}>
+                      <tr key={h.id} className="border-t">
                         <td className={`px-4 py-2 tabular-nums ${h.isPersonalBest ? "text-hue font-semibold" : ""}`}>
                           {h.wpm}
                           {h.isPersonalBest && (
@@ -264,14 +268,12 @@ export function StatsPanel({
               <button
                 onClick={onExport}
                 className="inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 font-mono text-sm transition-colors hover:bg-elevated"
-                style={{ borderColor: "var(--border)" }}
               >
                 <Download className="h-4 w-4" /> export backup
               </button>
               <button
                 onClick={() => fileRef.current?.click()}
                 className="inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 font-mono text-sm transition-colors hover:bg-elevated"
-                style={{ borderColor: "var(--border)" }}
               >
                 <Upload className="h-4 w-4" /> import backup
               </button>
@@ -293,14 +295,14 @@ export function StatsPanel({
             </div>
           </TabsContent>
         </Tabs>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="bg-elevated rounded-xl border p-4" style={{ borderColor: "var(--border)" }}>
+    <div className="bg-elevated rounded-xl border p-4">
       <div className="text-dim flex items-center gap-2 font-mono text-[11px] tracking-wider uppercase">
         {icon}
         {label}
@@ -341,7 +343,7 @@ function WordChip({ word, metric }: { word: UrgentWord; metric: "err" | "due" | 
         ? `${Math.round(word.bestWpm ?? 0)} wpm · ${word.attempts} reps`
         : `${dueLabel(word.dueInMs)} · ${word.attempts} reps`;
   return (
-    <span className="bg-elevated inline-flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-sm" style={{ borderColor: "var(--border)" }}>
+    <span className="bg-elevated inline-flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-sm">
       <span className={isErr ? "text-err" : "text-hue"}>{word.word}</span>
       <span className="text-dim text-xs">{metricText}</span>
     </span>
@@ -373,8 +375,7 @@ function ResetButton({ onReset }: { onReset: () => void }) {
           }, 3000);
         }
       }}
-      className="text-err inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 font-mono text-sm transition-colors hover:bg-elevated"
-      style={{ borderColor: "var(--err-edge)" }}
+      className="text-err inline-flex items-center gap-2 rounded-lg border border-err-edge px-4 py-2.5 font-mono text-sm transition-colors hover:bg-elevated"
     >
       <Trash2 className="h-4 w-4" />
       <span ref={labelRef}>reset all data</span>

@@ -54,6 +54,7 @@
   --color-elevated: var(--elevated);
   --color-missed: var(--missed);
   --color-chart-6: var(--chart-6);
+  --color-err-edge: var(--err-edge);
 }
 
 /* Cadence dark palette — warm charcoal, phosphor-green accent
@@ -69,6 +70,10 @@
   --card-foreground: #e8eaf0;
   --popover: #17181c;
   --popover-foreground: #e8eaf0;
+  /* --primary/--ring default to phosphor; the accent effect in page.tsx
+     mirrors the user's accent hue into them at runtime (build-time var()
+     inlining would erase the indirection here) so slider, switch, tooltip
+     and focus rings never leave a second hue on screen */
   --primary: #a3e635;
   --primary-foreground: #10130a;
   --secondary: #1c1e23;
