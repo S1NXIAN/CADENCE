@@ -14,16 +14,17 @@ import { useTypingSession } from "@/hooks/use-typing-session";
 import { usePackLifecycle } from "@/hooks/use-pack-lifecycle";
 import { useGlobalKeys } from "@/hooks/use-global-keys";
 import { generateTest } from "@/lib/typing/generator";
-import { emptyLearning, finalizeLearning, ingestEvents } from "@/lib/typing/profiles";
+import { createEmptyLearning, finalizeLearning, ingestEvents } from "@/lib/typing/profiles";
 import { finalizeWordReviews, ingestWordOutcomes } from "@/lib/typing/word-scheduler";
 import { generateInsights, nextTestPreview } from "@/lib/typing/insights";
 import { buildTestAudit, type TestAudit } from "@/lib/typing/audit";
 import { downloadBackup } from "@/lib/typing/backup";
 import { useToast } from "@/hooks/use-toast";
 import {
-  emptyStats, importData, isOnboarded, loadLearning, loadSettings,
+  importData, isOnboarded, loadLearning, loadSettings,
   loadStats, persistAll, recordResult, saveLearning, saveSettings, setOnboarded, storedLearningVersion, wipeAll,
 } from "@/lib/typing/storage";
+import { createEmptyStats } from "@/lib/typing/sanitize";
 import type { CharEvent, CoachInsight, LearningData, Settings, StatsData, TestMode, TestResult, WordOutcome } from "@/lib/typing/types";
 import { ACCENT_COLORS, DEFAULT_SETTINGS } from "@/lib/typing/types";
 import { Zap, Keyboard } from "lucide-react";
@@ -31,8 +32,8 @@ import { Zap, Keyboard } from "lucide-react";
 export default function Page() {
   const [ready, setReady] = useState(false);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const [learning, setLearning] = useState<LearningData>(() => emptyLearning());
-  const [stats, setStats] = useState<StatsData>(() => emptyStats());
+  const [learning, setLearning] = useState<LearningData>(() => createEmptyLearning());
+  const [stats, setStats] = useState<StatsData>(() => createEmptyStats());
   const [resultForDisplay, setResultForDisplay] = useState<TestResult | null>(null);
   const [insights, setInsights] = useState<CoachInsight[]>([]);
   const [audit, setAudit] = useState<TestAudit | null>(null);
@@ -67,7 +68,7 @@ export default function Page() {
     setReady(true);
   }, []);
 
-  usePackLifecycle({ ready, enabled: settings.onlinePacks, sessionRef });
+  usePackLifecycle({ ready, enabled: settings.usesOnlinePacks, sessionRef });
 
   // ---- accent theming -----------------------------------------------------
   useEffect(() => {
@@ -85,7 +86,7 @@ export default function Page() {
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   const playClick = useCallback((correct: boolean) => {
-    if (!settingsRef.current.sound) return;
+    if (!settingsRef.current.isSoundOn) return;
     try {
       const AudioCtor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       audioCtxRef.current ??= new AudioCtor();
@@ -205,7 +206,7 @@ export default function Page() {
   useEffect(() => {
     if (!ready) return;
     restartAll();
-  }, [ready, settings.mode, settings.timeDuration, settings.wordCount, settings.punctuation, settings.numbers, restartAll]);
+  }, [ready, settings.mode, settings.timeDuration, settings.wordCount, settings.hasPunctuation, settings.hasNumbers, restartAll]);
 
   useGlobalKeys({
     ready,
@@ -290,8 +291,8 @@ export default function Page() {
   const handleReset = useCallback(() => {
     wipeAll();
     setSettings(DEFAULT_SETTINGS);
-    setLearning(emptyLearning());
-    setStats(emptyStats());
+    setLearning(createEmptyLearning());
+    setStats(createEmptyStats());
     setStatsOpen(false);
     setResultForDisplay(null);
     setInsights([]);
@@ -302,16 +303,16 @@ export default function Page() {
   const handleSelectMode = useCallback((mode: TestMode) => updateSettings({ mode }), [updateSettings]);
   const handleSelectTime = useCallback((timeDuration: number) => updateSettings({ mode: "time", timeDuration }), [updateSettings]);
   const handleSelectWordCount = useCallback((wordCount: number) => updateSettings({ wordCount }), [updateSettings]);
-  const handleTogglePunctuation = useCallback(() => updateSettings({ punctuation: !settingsRef.current.punctuation }), [updateSettings]);
-  const handleToggleNumbers = useCallback(() => updateSettings({ numbers: !settingsRef.current.numbers }), [updateSettings]);
+  const handleTogglePunctuation = useCallback(() => updateSettings({ hasPunctuation: !settingsRef.current.hasPunctuation }), [updateSettings]);
+  const handleToggleNumbers = useCallback(() => updateSettings({ hasNumbers: !settingsRef.current.hasNumbers }), [updateSettings]);
 
   const done = session.status === "done" && resultForDisplay;
   // the preview only changes when the learning model or mode changes — memoized
   // because page re-renders ~10x/s while running (timer ticks + live metrics)
   // and the preview walks every key/bigram/word profile on each call
   const coachLine = useMemo(
-    () => (done || !settings.showCoach ? "" : nextTestPreview(learning, settings.mode)),
-    [done, settings.showCoach, learning, settings.mode]
+    () => (done || !settings.isCoachOn ? "" : nextTestPreview(learning, settings.mode)),
+    [done, settings.isCoachOn, learning, settings.mode]
   );
 
   if (!ready) {
@@ -344,8 +345,8 @@ export default function Page() {
         mode={settings.mode}
         timeDuration={settings.timeDuration}
         wordCount={settings.wordCount}
-        punctuation={settings.punctuation}
-        numbers={settings.numbers}
+        hasPunctuation={settings.hasPunctuation}
+        hasNumbers={settings.hasNumbers}
         adaptiveIntensity={settings.adaptiveIntensity}
         onSelectTime={handleSelectTime}
         onSelectWordCount={handleSelectWordCount}
@@ -361,7 +362,7 @@ export default function Page() {
           {done ? (
             <Results
               result={resultForDisplay}
-              insights={settings.showCoach ? insights : []}
+              insights={settings.isCoachOn ? insights : []}
               audit={audit}
             />
           ) : (
@@ -374,7 +375,7 @@ export default function Page() {
                 wordCount={session.words.length}
                 liveWpm={session.liveWpm}
                 liveAcc={session.liveAcc}
-                showLiveWpm={settings.liveWpm}
+                isLiveWpmOn={settings.isLiveWpmOn}
               />
               <WordDisplay
                 words={session.words}
@@ -386,7 +387,7 @@ export default function Page() {
                 focusSignal={focusSignal}
                 onKeyDown={session.handleKeyDown}
               />
-              {settings.showCoach && coachLine && (
+              {settings.isCoachOn && coachLine && (
                 <div className="text-dim mt-6 flex items-start gap-2.5 px-1 font-mono text-[13px] leading-relaxed xl:mt-7 xl:text-sm">
                   <Zap className="text-hue mt-0.5 h-4 w-4 shrink-0" />
                   <span>{coachLine}</span>
@@ -403,7 +404,7 @@ export default function Page() {
         </div>
       </main>
 
-      <ConsoleFooter strictMode={settings.strictMode} />
+      <ConsoleFooter isStrict={settings.isStrict} />
 
       {/* overlays */}
       <CommandPalette open={paletteOpen} onOpenChange={closePalette} settings={settings} run={runAction} />

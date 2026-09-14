@@ -32,7 +32,7 @@ function describe(s: PackState): { icon: typeof Wifi; label: string; cls: string
   const base = "bg-elevated";
   switch (s.status) {
     case "ready": {
-      if (s.cachedOnly) {
+      if (s.isCachedOnly) {
         return {
           icon: WifiOff,
           label: `full potential · ${s.extraWords.toLocaleString()} words cached`,

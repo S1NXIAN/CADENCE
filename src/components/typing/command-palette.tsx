@@ -27,7 +27,7 @@ export type PaletteAction =
   | { type: "mode"; mode: TestMode }
   | { type: "time"; seconds: number }
   | { type: "words"; count: number }
-  | { type: "toggle"; key: "punctuation" | "numbers" | "strictMode" | "liveWpm" | "sound" }
+  | { type: "toggle"; key: "hasPunctuation" | "hasNumbers" | "isStrict" | "isLiveWpmOn" | "isSoundOn" }
   | { type: "intensity"; value: number }
   | { type: "restart" }
   | { type: "stats" }
@@ -94,17 +94,17 @@ export const CommandPalette = memo(function CommandPalette({ open, onOpenChange,
 
         <CommandSeparator />
         <CommandGroup heading="training options">
-          <CommandItem onSelect={() => act({ type: "toggle", key: "punctuation" })}>
+          <CommandItem onSelect={() => act({ type: "toggle", key: "hasPunctuation" })}>
             <AtSign />
-            <span>punctuation {settings.punctuation ? "(on)" : "(off)"}</span>
+            <span>punctuation {settings.hasPunctuation ? "(on)" : "(off)"}</span>
           </CommandItem>
-          <CommandItem onSelect={() => act({ type: "toggle", key: "numbers" })}>
+          <CommandItem onSelect={() => act({ type: "toggle", key: "hasNumbers" })}>
             <Hash />
-            <span>numbers {settings.numbers ? "(on)" : "(off)"}</span>
+            <span>numbers {settings.hasNumbers ? "(on)" : "(off)"}</span>
           </CommandItem>
-          <CommandItem onSelect={() => act({ type: "toggle", key: "strictMode" })}>
-            {settings.strictMode ? <Lock /> : <Unlock />}
-            <span>strict mode — no backspace {settings.strictMode ? "(on)" : "(off)"}</span>
+          <CommandItem onSelect={() => act({ type: "toggle", key: "isStrict" })}>
+            {settings.isStrict ? <Lock /> : <Unlock />}
+            <span>strict mode — no backspace {settings.isStrict ? "(on)" : "(off)"}</span>
           </CommandItem>
           <CommandItem onSelect={() => act({ type: "intensity", value: Math.min(100, settings.adaptiveIntensity + 20) })}>
             <Gauge />
@@ -131,13 +131,13 @@ export const CommandPalette = memo(function CommandPalette({ open, onOpenChange,
             <SettingsIcon />
             <span>open settings</span>
           </CommandItem>
-          <CommandItem onSelect={() => act({ type: "toggle", key: "liveWpm" })}>
+          <CommandItem onSelect={() => act({ type: "toggle", key: "isLiveWpmOn" })}>
             <Gauge />
-            <span>live wpm {settings.liveWpm ? "(on)" : "(off)"}</span>
+            <span>live wpm {settings.isLiveWpmOn ? "(on)" : "(off)"}</span>
           </CommandItem>
-          <CommandItem onSelect={() => act({ type: "toggle", key: "sound" })}>
-            {settings.sound ? <Volume2 /> : <VolumeX />}
-            <span>keypress sound {settings.sound ? "(on)" : "(off)"}</span>
+          <CommandItem onSelect={() => act({ type: "toggle", key: "isSoundOn" })}>
+            {settings.isSoundOn ? <Volume2 /> : <VolumeX />}
+            <span>keypress sound {settings.isSoundOn ? "(on)" : "(off)"}</span>
           </CommandItem>
           <CommandItem onSelect={() => act({ type: "export" })}>
             <Download />

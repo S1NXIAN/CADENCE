@@ -2,8 +2,8 @@
 
 import { useMemo, useRef } from "react";
 import type { LearningData, StatsData } from "@/lib/typing/types";
-import { computeWeakKeys, topConfusions, weakBigrams } from "@/lib/typing/profiles";
-import { dueWords, fastestWords, worstWords, type UrgentWord } from "@/lib/typing/word-scheduler";
+import { computeWeakKeys, collectTopConfusions, collectWeakBigrams } from "@/lib/typing/profiles";
+import { collectDueWords, collectFastestWords, collectWorstWords, type UrgentWord } from "@/lib/typing/word-scheduler";
 import { KeyHeatmap } from "./key-heatmap";
 import { HistoryChart } from "./history-chart";
 import { ActivityHeatmap } from "./activity-heatmap";
@@ -49,14 +49,14 @@ export function StatsPanel({
   }, [stats.history]);
 
   const weak = useMemo(() => computeWeakKeys(learning).slice(0, 8), [learning]);
-  const bgs = useMemo(() => weakBigrams(learning, 6), [learning]);
-  const confusions = useMemo(() => topConfusions(learning, 5), [learning]);
+  const bgs = useMemo(() => collectWeakBigrams(learning, 6), [learning]);
+  const confusions = useMemo(() => collectTopConfusions(learning, 5), [learning]);
   const wordLists = useMemo(
     () => ({
       tracked: Object.keys(learning.wordProfiles ?? {}).length,
-      worst: worstWords(learning, 8),
-      fastest: fastestWords(learning, 8),
-      due: dueWords(learning, 6),
+      worst: collectWorstWords(learning, 8),
+      fastest: collectFastestWords(learning, 8),
+      due: collectDueWords(learning, 6),
     }),
     [learning]
   );

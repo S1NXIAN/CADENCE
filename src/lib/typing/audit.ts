@@ -5,7 +5,7 @@ import type {
   StatsData,
   TestResult,
 } from "./types";
-import { personalMedianLatency } from "./profiles";
+import { calculateMedianLatency } from "./profiles";
 import { diffWord } from "./diff";
 
 /**
@@ -67,11 +67,11 @@ export function analyzeEvents(events: CharEvent[], focusKeys: string[]): EventAn
 
     // expected-key exposure (spaces tracked separately — not a key)
     if (ev.expected && ev.expected !== " ") {
-      bumpPerKey(ev.expected.toLowerCase(), !ev.correct);
+      bumpPerKey(ev.expected.toLowerCase(), !ev.isCorrect);
     }
 
     // inter-key latency on clean presses (mirrors profiles.ingestEvents rules)
-    if (ev.correct && typedTracked && prevT !== null && prevCorrect) {
+    if (ev.isCorrect && typedTracked && prevT !== null && prevCorrect) {
       const d = ev.t - prevT;
       if (d > 20 && d < LAT_MAX) {
         const k = ev.typed.toLowerCase();
@@ -82,7 +82,7 @@ export function analyzeEvents(events: CharEvent[], focusKeys: string[]): EventAn
       if (d >= HESITATION_MS) a.hesitations.push({ ch: ev.typed, ms: d });
     }
 
-    if (!ev.correct) {
+    if (!ev.isCorrect) {
       a.errors += 1;
       if (ev.typed === "" && ev.expected) {
         // dropped letter — blame the expected key, including focus keys
@@ -105,7 +105,7 @@ export function analyzeEvents(events: CharEvent[], focusKeys: string[]): EventAn
     }
 
     prevT = ev.t;
-    prevCorrect = ev.correct;
+    prevCorrect = ev.isCorrect;
   }
   return a;
 }
@@ -381,7 +381,7 @@ export function buildTestAudit(
   };
 
   // ---- key report ----------------------------------------------------------
-  const baseline = personalMedianLatency(learning) || 150;
+  const baseline = calculateMedianLatency(learning) || 150;
   const focus: AuditKeyReport[] = result.focusKeys.map((k) => {
     const pk = ev.perKey.get(k) ?? { attempts: 0, errors: 0 };
     const lat = ev.latencies.get(k);

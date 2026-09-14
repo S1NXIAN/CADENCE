@@ -13,7 +13,7 @@ interface StageHudProps {
   wordCount: number;
   liveWpm: number;
   liveAcc: number;
-  showLiveWpm: boolean;
+  isLiveWpmOn: boolean;
 }
 
 /**
@@ -30,7 +30,7 @@ export const StageHud = memo(function StageHud({
   wordCount,
   liveWpm,
   liveAcc,
-  showLiveWpm,
+  isLiveWpmOn,
 }: StageHudProps) {
   return (
     <div className="mb-4 flex h-8 items-end justify-between px-1 font-mono xl:mb-5 xl:h-10">
@@ -44,7 +44,7 @@ export const StageHud = memo(function StageHud({
             {Math.min(wordIndex + 1, wordCount)} / {wordCount} words
           </div>
         )}
-        {showLiveWpm && status === "running" && (
+        {isLiveWpmOn && status === "running" && (
           <>
             <div className="text-sub tabular-nums text-lg xl:text-2xl" aria-live="off">
               {liveWpm} <span className="text-dim text-xs xl:text-sm">wpm</span>

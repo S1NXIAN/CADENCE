@@ -32,7 +32,7 @@ export interface PackState {
   extraWords: number; // pack words merged into the active pool
   extraQuotes: number;
   lastSync: number | null; // epoch ms of last successful fetch
-  cachedOnly: boolean; // packs active from cache while offline
+  isCachedOnly: boolean; // packs active from cache while offline
 }
 
 let state: PackState = {
@@ -41,7 +41,7 @@ let state: PackState = {
   extraWords: 0,
   extraQuotes: 0,
   lastSync: null,
-  cachedOnly: false,
+  isCachedOnly: false,
 };
 
 const listeners = new Set<() => void>();
@@ -169,7 +169,7 @@ function initPacks(enabled: boolean): void {
 
   if (!enabled) {
     clearPacks();
-    setState({ status: "off", extraWords: 0, extraQuotes: 0, cachedOnly: false });
+    setState({ status: "off", extraWords: 0, extraQuotes: 0, isCachedOnly: false });
     return;
   }
 
@@ -189,7 +189,7 @@ function initPacks(enabled: boolean): void {
     const sizes = packSizes();
     setState({
       status: "ready",
-      cachedOnly: !online,
+      isCachedOnly: !online,
       extraWords: sizes.common,
       extraQuotes: sizes.quotes,
       lastSync: Math.max(wc?.t ?? 0, qc?.t ?? 0) || null,
@@ -216,7 +216,7 @@ async function doRefreshPacks(): Promise<void> {
   const online = typeof navigator !== "undefined" ? navigator.onLine : false;
   setState({ online });
   if (!online) {
-    setState({ status: state.extraWords > 0 || state.extraQuotes > 0 ? "ready" : "local", cachedOnly: state.extraWords > 0 });
+    setState({ status: state.extraWords > 0 || state.extraQuotes > 0 ? "ready" : "local", isCachedOnly: state.extraWords > 0 });
     return;
   }
 
@@ -244,7 +244,7 @@ async function doRefreshPacks(): Promise<void> {
     const sizes = packSizes();
     setState({
       status: "ready",
-      cachedOnly: false,
+      isCachedOnly: false,
       extraWords: sizes.common,
       extraQuotes: sizes.quotes,
       lastSync,
@@ -252,7 +252,7 @@ async function doRefreshPacks(): Promise<void> {
   } else {
     // both fetches failed but we're "online" — CDN unreachable/blocked
     const hasPacks = state.extraWords > 0 || state.extraQuotes > 0;
-    setState({ status: hasPacks ? "ready" : "error", cachedOnly: hasPacks });
+    setState({ status: hasPacks ? "ready" : "error", isCachedOnly: hasPacks });
   }
 }
 
@@ -267,7 +267,7 @@ export function handleOffline(): void {
   setState({
     online: false,
     status: hasPacks ? "ready" : "local",
-    cachedOnly: hasPacks,
+    isCachedOnly: hasPacks,
   });
 }
 
@@ -275,12 +275,12 @@ export function handleOffline(): void {
 export function setPacksEnabled(enabled: boolean): void {
   if (!enabled) {
     clearPacks();
-    setState({ status: "off", extraWords: 0, extraQuotes: 0, cachedOnly: false });
+    setState({ status: "off", extraWords: 0, extraQuotes: 0, isCachedOnly: false });
   } else {
     const online = typeof navigator !== "undefined" ? navigator.onLine : false;
     // hydrate from cache immediately; the page drives any refresh
     initPacks(true);
-    if (!online) setState({ status: state.extraWords > 0 ? "ready" : "local", cachedOnly: state.extraWords > 0 });
+    if (!online) setState({ status: state.extraWords > 0 ? "ready" : "local", isCachedOnly: state.extraWords > 0 });
   }
 }
 

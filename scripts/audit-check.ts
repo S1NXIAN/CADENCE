@@ -5,8 +5,8 @@
  */
 import { buildTestAudit } from "../src/lib/typing/audit";
 import { generateInsights } from "../src/lib/typing/insights";
-import { emptyLearning } from "../src/lib/typing/profiles";
-import { emptyStats } from "../src/lib/typing/storage";
+import { createEmptyLearning } from "../src/lib/typing/profiles";
+import { createEmptyStats } from "../src/lib/typing/sanitize";
 import type { CharEvent, SecondSample, TestResult } from "../src/lib/typing/types";
 
 let t = 0;
@@ -30,62 +30,62 @@ t = 120;
 // "the " — clean, 110-130ms
 for (const ch of ["t", "h", "e"]) {
   t += 120;
-  events.push({ t, expected: ch, typed: ch, correct: true });
+  events.push({ t, expected: ch, typed: ch, isCorrect: true });
 }
 t += 130;
-events.push({ t, expected: " ", typed: " ", correct: true });
+events.push({ t, expected: " ", typed: " ", isCorrect: true });
 // "quick " — q>w confusion + slow q
 t += 210; // hesitation-ish on q
-events.push({ t, expected: "q", typed: "w", correct: false });
+events.push({ t, expected: "q", typed: "w", isCorrect: false });
 t += 150;
-events.push({ t, expected: "q", typed: "q", correct: true });
+events.push({ t, expected: "q", typed: "q", isCorrect: true });
 for (const ch of ["u", "i", "c", "k"]) {
   t += 125;
-  events.push({ t, expected: ch, typed: ch, correct: true });
+  events.push({ t, expected: ch, typed: ch, isCorrect: true });
 }
 t += 130;
-events.push({ t, expected: " ", typed: " ", correct: true });
+events.push({ t, expected: " ", typed: " ", isCorrect: true });
 // "brown " — 'n' never lands (missed), 'o' slow
 for (const ch of ["b", "r"]) {
   t += 120;
-  events.push({ t, expected: ch, typed: ch, correct: true });
+  events.push({ t, expected: ch, typed: ch, isCorrect: true });
 }
 t += 480; // freeze before o
-events.push({ t, expected: "o", typed: "o", correct: true });
+events.push({ t, expected: "o", typed: "o", isCorrect: true });
 t += 125;
-events.push({ t, expected: "w", typed: "w", correct: true });
+events.push({ t, expected: "w", typed: "w", isCorrect: true });
 // user hits space without the n -> synthetic missed n, then space
 t += 100;
-events.push({ t, expected: "n", typed: "", correct: false });
-events.push({ t, expected: " ", typed: " ", correct: true });
+events.push({ t, expected: "n", typed: "", isCorrect: false });
+events.push({ t, expected: " ", typed: " ", isCorrect: true });
 // "fox " + one extra char past the end
 for (const ch of ["f", "o"]) {
   t += 120;
-  events.push({ t, expected: ch, typed: ch, correct: true });
+  events.push({ t, expected: ch, typed: ch, isCorrect: true });
 }
 t += 130;
-events.push({ t, expected: "x", typed: "x", correct: true });
+events.push({ t, expected: "x", typed: "x", isCorrect: true });
 t += 90;
-events.push({ t, expected: null, typed: "z", correct: false }); // overshoot
+events.push({ t, expected: null, typed: "z", isCorrect: false }); // overshoot
 t += 130;
-events.push({ t, expected: " ", typed: " ", correct: true });
+events.push({ t, expected: " ", typed: " ", isCorrect: true });
 // "jumps" clean finish
 for (const ch of ["j", "u", "m", "p", "s"]) {
   t += 120;
-  events.push({ t, expected: ch, typed: ch, correct: true });
+  events.push({ t, expected: ch, typed: ch, isCorrect: true });
 }
 t += 130;
-events.push({ t, expected: " ", typed: " ", correct: true });
+events.push({ t, expected: " ", typed: " ", isCorrect: true });
 // "onto oak" — slow 'o' presses (3+ samples so the slowest-key filter passes)
 for (const ch of ["o", "n", "t", "o"]) {
   t += ch === "o" ? 420 : 120;
-  events.push({ t, expected: ch, typed: ch, correct: true });
+  events.push({ t, expected: ch, typed: ch, isCorrect: true });
 }
 t += 130;
-events.push({ t, expected: " ", typed: " ", correct: true });
+events.push({ t, expected: " ", typed: " ", isCorrect: true });
 for (const ch of ["o", "a", "k"]) {
   t += ch === "o" ? 430 : 120;
-  events.push({ t, expected: ch, typed: ch, correct: true });
+  events.push({ t, expected: ch, typed: ch, isCorrect: true });
 }
 
 // ---- per-second samples: 30s test, fade + error cluster @ 14s --------------
@@ -121,7 +121,7 @@ const targets = ["the", "quick", "brown", "fox", "jumps", "onto", "oak"];
 const typed = ["the", "quick", "brow", "foxz", "jumps", "onto", "oak"];
 
 // history: 12 prior tests on the same label
-const stats = emptyStats();
+const stats = createEmptyStats();
 for (let i = 0; i < 12; i++) {
   stats.history.push({
     ...result,
@@ -133,7 +133,7 @@ for (let i = 0; i < 12; i++) {
 stats.personalBests["adaptive 25"] = { wpm: 68, accuracy: 96, timestamp: Date.now() - 86400000 };
 stats.history.forEach((h) => (h.modeLabel = "adaptive 25"));
 
-const learning = emptyLearning();
+const learning = createEmptyLearning();
 
 console.log("buildTestAudit:");
 const audit = buildTestAudit(result, events, targets, typed, stats, learning);
@@ -156,7 +156,7 @@ check("last10 avg ~56.5 -> 57", audit.compare.last10Wpm !== null && audit.compar
 check("wpmDelta +4/+5", (audit.compare.wpmDelta ?? 0) >= 4 && (audit.compare.wpmDelta ?? 0) <= 5, `got ${audit.compare.wpmDelta}`);
 
 // testNo must use the LIFETIME counter once history hits its 500 cap
-const cappedLearning = { ...emptyLearning(), totalTests: 847 };
+const cappedLearning = { ...createEmptyLearning(), totalTests: 847 };
 const cappedAudit = buildTestAudit(result, events, targets, typed, stats, cappedLearning);
 check("testNo uses lifetime counter past history cap", cappedAudit.compare.testNo === 847, `got ${cappedAudit.compare.testNo}`);
 

@@ -3,8 +3,8 @@
  * Seeds the exact payload sanitizeLearning will read, computes urgency with
  * the real module, then prints what the UI *should* show.
  */
-import { wordUrgencies, worstWords, fastestWords, dueWords } from "../src/lib/typing/word-scheduler";
-import { sanitizeLearning } from "../src/lib/typing/storage";
+import { calculateWordUrgencies, collectWorstWords, collectFastestWords, collectDueWords } from "../src/lib/typing/word-scheduler";
+import { sanitizeLearning } from "../src/lib/typing/sanitize";
 import { reviewMem, newMemCard } from "../src/lib/typing/memory";
 
 const MIN = 60_000;
@@ -36,9 +36,9 @@ L.wordProfiles.rhythm.mem = reviewMem(L.wordProfiles.rhythm.mem, "hard", now - 3
 L.wordProfiles.rhythm.mem = reviewMem(L.wordProfiles.rhythm.mem, "good", now - 6 * MIN);
 
 console.log("urgencies:");
-for (const u of wordUrgencies(L)) {
+for (const u of calculateWordUrgencies(L)) {
   console.log(`  ${u.word}: u=${u.urgency.toFixed(3)} R=${u.retrievability.toFixed(2)} err=${(u.errRate * 100).toFixed(0)}% dueIn=${u.dueInMs === null ? "null" : (u.dueInMs / MIN).toFixed(1) + "m"}`);
 }
-console.log("worst:", worstWords(L).map((w) => w.word));
-console.log("fastest:", fastestWords(L).map((w) => `${w.word}:${w.bestWpm?.toFixed(0)}`));
-console.log("due:", dueWords(L).map((w) => w.word));
+console.log("worst:", collectWorstWords(L).map((w) => w.word));
+console.log("fastest:", collectFastestWords(L).map((w) => `${w.word}:${w.bestWpm?.toFixed(0)}`));
+console.log("due:", collectDueWords(L).map((w) => w.word));

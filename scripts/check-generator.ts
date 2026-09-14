@@ -4,7 +4,7 @@
  * Run: bun scripts/check-generator.ts
  */
 import { generateTest } from "../src/lib/typing/generator";
-import { emptyLearning } from "../src/lib/typing/profiles";
+import { createEmptyLearning } from "../src/lib/typing/profiles";
 import { newMemCard, reviewMem } from "../src/lib/typing/memory";
 import { DEFAULT_SETTINGS, type LearningData, type Settings } from "../src/lib/typing/types";
 
@@ -17,7 +17,7 @@ function weakProfile(errRate: number, latency: number) {
   return { attempts: 40, errors: Math.round(40 * errRate), errRate, latency, lastSeen: Date.now(), mem: m };
 }
 function learningWithSignal(): LearningData {
-  const l = emptyLearning();
+  const l = createEmptyLearning();
   l.totalTests = 5;
   const weak = ["q", "p", "y", ";", "x"];
   for (const k of weak) {
@@ -47,7 +47,7 @@ function expectCount(label: string, words: string[], want: number) {
 }
 
 const learning = learningWithSignal();
-const empty = emptyLearning();
+const empty = createEmptyLearning();
 
 // adaptive: all counts x intensities x both learning states
 for (const count of [10, 25, 50, 100]) {

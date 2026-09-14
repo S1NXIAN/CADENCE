@@ -1,5 +1,5 @@
 import type { LearningData, Settings, TestMode } from "./types";
-import { bigramUrgencies, keyUrgencies } from "./profiles";
+import { calculateBigramUrgencies, calculateKeyUrgencies } from "./profiles";
 import { pickReviewWords } from "./word-scheduler";
 import { getAdaptivePool, getCommonPool, getQuotes } from "./pool";
 
@@ -198,8 +198,8 @@ export function generateAdaptive(
   withPunct: boolean,
   withNumbers: boolean
 ): { words: string[]; focusKeys: string[]; drills: string[] } {
-  const urgentKeys = keyUrgencies(learning).filter((u) => u.urgency > MIN_URGENCY).slice(0, 8);
-  const urgentBgs = bigramUrgencies(learning).filter((u) => u.urgency > MIN_URGENCY).slice(0, 14);
+  const urgentKeys = calculateKeyUrgencies(learning).filter((u) => u.urgency > MIN_URGENCY).slice(0, 8);
+  const urgentBgs = calculateBigramUrgencies(learning).filter((u) => u.urgency > MIN_URGENCY).slice(0, 14);
   const hasSignal = learning.totalTests >= 1 && (urgentKeys.length > 0 || urgentBgs.length > 0);
 
   const pool = getAdaptivePool();
@@ -289,8 +289,8 @@ export function generateTest(settings: Settings, learning: LearningData): Genera
         learning,
         settings.wordCount,
         settings.adaptiveIntensity,
-        settings.punctuation,
-        settings.numbers
+        settings.hasPunctuation,
+        settings.hasNumbers
       );
       return {
         words,
@@ -301,7 +301,7 @@ export function generateTest(settings: Settings, learning: LearningData): Genera
       };
     }
     case "time": {
-      const { words } = generateTime(settings.timeDuration, settings.punctuation, settings.numbers);
+      const { words } = generateTime(settings.timeDuration, settings.hasPunctuation, settings.hasNumbers);
       return {
         words,
         focusKeys: [],
@@ -311,7 +311,7 @@ export function generateTest(settings: Settings, learning: LearningData): Genera
       };
     }
     case "words": {
-      const { words } = generateWords(settings.wordCount, settings.punctuation, settings.numbers);
+      const { words } = generateWords(settings.wordCount, settings.hasPunctuation, settings.hasNumbers);
       return {
         words,
         focusKeys: [],

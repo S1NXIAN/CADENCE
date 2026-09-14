@@ -57,44 +57,44 @@ export const SettingsModal = memo(function SettingsModal({ open, onOpenChange, s
             <ToggleRow
               label="strict mode"
               hint="disable backspace — forces clean muscle memory"
-              checked={settings.strictMode}
-              onChange={(v) => update({ strictMode: v })}
+              checked={settings.isStrict}
+              onChange={(v) => update({ isStrict: v })}
             />
             <ToggleRow
               label="punctuation"
               hint="mix capitals and punctuation into tests"
-              checked={settings.punctuation}
-              onChange={(v) => update({ punctuation: v })}
+              checked={settings.hasPunctuation}
+              onChange={(v) => update({ hasPunctuation: v })}
             />
             <ToggleRow
               label="numbers"
               hint="mix in random numbers"
-              checked={settings.numbers}
-              onChange={(v) => update({ numbers: v })}
+              checked={settings.hasNumbers}
+              onChange={(v) => update({ hasNumbers: v })}
             />
             <ToggleRow
               label="online word packs"
               hint="when online, fetches a 10k frequency word list and extra quotes, cached for offline use — the core stays 100% local"
-              checked={settings.onlinePacks}
-              onChange={(v) => update({ onlinePacks: v })}
+              checked={settings.usesOnlinePacks}
+              onChange={(v) => update({ usesOnlinePacks: v })}
             />
             <ToggleRow
               label="live wpm"
               hint="show speed while typing"
-              checked={settings.liveWpm}
-              onChange={(v) => update({ liveWpm: v })}
+              checked={settings.isLiveWpmOn}
+              onChange={(v) => update({ isLiveWpmOn: v })}
             />
             <ToggleRow
               label="coach notes"
               hint="post-test analysis and tips"
-              checked={settings.showCoach}
-              onChange={(v) => update({ showCoach: v })}
+              checked={settings.isCoachOn}
+              onChange={(v) => update({ isCoachOn: v })}
             />
             <ToggleRow
               label="keypress sound"
               hint="soft click on every keystroke"
-              checked={settings.sound}
-              onChange={(v) => update({ sound: v })}
+              checked={settings.isSoundOn}
+              onChange={(v) => update({ isSoundOn: v })}
             />
           </div>
 

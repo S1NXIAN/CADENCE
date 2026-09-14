@@ -4,7 +4,8 @@
  * run math, export/import round-trip. Run: bun scripts/activity-check.ts
  */
 import type { StatsData, TestResult } from "../src/lib/typing/types";
-import { emptyStats, exportData, importData, isoDayLocal, recordResult, sanitizeStats } from "../src/lib/typing/storage";
+import { isoDayLocal, recordResult, exportData, importData } from "../src/lib/typing/storage";
+import { createEmptyStats, sanitizeStats } from "../src/lib/typing/sanitize";
 import { activitySummary, buildActivityDays, formatDuration } from "../src/lib/typing/activity";
 
 let pass = 0;
@@ -55,7 +56,7 @@ function makeResult(wpm: number, duration: number, offsetDays = 0): TestResult {
 console.log("=== buildActivityDays ===");
 {
   // 1. history-only backfill (legacy profile with no ledger)
-  const stats = emptyStats();
+  const stats = createEmptyStats();
   stats.history = [makeResult(80, 30, 0), makeResult(90, 60, 0), makeResult(70, 30, 1), makeResult(60, 25, 10)];
   const days = buildActivityDays(stats);
   const today = days.get(dayKey(0));
@@ -66,7 +67,7 @@ console.log("=== buildActivityDays ===");
   check("history-only: 10d-ago present", days.get(dayKey(10))?.tests === 1);
 
   // 2. ledger is source of truth; merge takes per-field max (no double count)
-  const mixed = emptyStats();
+  const mixed = createEmptyStats();
   mixed.history = [makeResult(70, 40, 0), makeResult(65, 40, 2)];
   mixed.dailyActivity[dayKey(0)] = { tests: 5, timeS: 300, bestWpm: 90 };
   mixed.dailyActivity[dayKey(5)] = { tests: 1, timeS: 30, bestWpm: null };
@@ -79,7 +80,7 @@ console.log("=== buildActivityDays ===");
   check("merge: history-only day kept", m.get(dayKey(2))?.tests === 1);
 
   // 3. window clipping
-  const win = emptyStats();
+  const win = createEmptyStats();
   win.history = [makeResult(80, 30, 395), makeResult(80, 30, 420)];
   const w = buildActivityDays(win, 400);
   check("window: 395d-ago inside", w.has(dayKey(395)));
@@ -88,7 +89,7 @@ console.log("=== buildActivityDays ===");
 
 console.log("\n=== recordResult ledger ===");
 {
-  let stats: StatsData = emptyStats();
+  let stats: StatsData = createEmptyStats();
   stats = recordResult(stats, makeResult(80, 30));
   let t = stats.dailyActivity[dayKey(0)];
   check("bump: first test", t?.tests === 1 && t?.timeS === 30 && t?.bestWpm === 80, JSON.stringify(t));
@@ -107,7 +108,7 @@ console.log("\n=== recordResult ledger ===");
 console.log("\n=== sanitizeStats ledger hardening ===");
 {
   const junk = {
-    ...emptyStats(),
+    ...createEmptyStats(),
     dailyActivity: {
       "not-a-date": { tests: 5, timeS: 60, bestWpm: 80 }, // bad key
       [dayKey(4)]: "nope", // bad value
@@ -122,7 +123,7 @@ console.log("\n=== sanitizeStats ledger hardening ===");
   check("negatives clamped to 0", d1.tests === 0 && d1.timeS === 0 && d1.bestWpm === null, JSON.stringify(d1));
 
   // Infinity survives JSON round-trip as null in JS objects — feed it raw:
-  const inf = { ...emptyStats(), dailyActivity: {} } as StatsData;
+  const inf = { ...createEmptyStats(), dailyActivity: {} } as StatsData;
   (inf.dailyActivity as Record<string, unknown>)[dayKey(3)] = { tests: Number.POSITIVE_INFINITY, timeS: 1e301, bestWpm: 90 };
   const s2 = sanitizeStats(inf);
   const d3 = s2.dailyActivity[dayKey(3)]!;
@@ -139,7 +140,7 @@ console.log("\n=== sanitizeStats ledger hardening ===");
     const key = isoDayLocal(new Date(base.getTime() - i * DAY));
     many[key] = { tests: 1, timeS: 30, bestWpm: 80 };
   }
-  const s3 = sanitizeStats({ ...emptyStats(), dailyActivity: many } as unknown as Record<string, unknown>);
+  const s3 = sanitizeStats({ ...createEmptyStats(), dailyActivity: many } as unknown as Record<string, unknown>);
   const n = Object.keys(s3.dailyActivity).length;
   check("cap: 450 days -> 400", n === 400, String(n));
   const kept = Object.keys(s3.dailyActivity).sort();
@@ -150,7 +151,7 @@ console.log("\n=== activitySummary ===");
 {
   // 3-day consecutive run: ledger seeded per-day (recordResult only ever
   // bumps TODAY — the day spread comes from result timestamps via history)
-  const stats: StatsData = emptyStats();
+  const stats: StatsData = createEmptyStats();
   for (const off of [0, 1, 2]) {
     stats.dailyActivity[dayKey(off)] = { tests: 1, timeS: 30, bestWpm: 80 };
   }
@@ -178,7 +179,7 @@ console.log("\n=== activitySummary ===");
   check("runs: gap -> current 1 (today active, yesterday empty)", sum.currentRun === 1, JSON.stringify({ c: sum.currentRun }));
 
   // busiest tie-break by timeS
-  const tieMap = buildActivityDays(emptyStats());
+  const tieMap = buildActivityDays(createEmptyStats());
   tieMap.set(dayKey(0), { date: dayKey(0), tests: 2, timeS: 60, bestWpm: 80 });
   tieMap.set(dayKey(1), { date: dayKey(1), tests: 2, timeS: 120, bestWpm: 80 });
   sum = activitySummary(tieMap);
@@ -199,10 +200,10 @@ console.log("\n=== formatDuration ===");
 
 console.log("\n=== export/import round-trip ===");
 {
-  let stats: StatsData = emptyStats();
+  let stats: StatsData = createEmptyStats();
   stats = recordResult(stats, makeResult(84, 42));
   const payload = exportData(
-    { mode: "time", timeDuration: 30, wordCount: 25, punctuation: false, numbers: false, adaptiveIntensity: 65, strictMode: false, liveWpm: true, sound: false, caretStyle: "line", accent: "lime", showCoach: true, onlinePacks: true },
+    { mode: "time", timeDuration: 30, wordCount: 25, hasPunctuation: false, hasNumbers: false, adaptiveIntensity: 65, isStrict: false, isLiveWpmOn: true, isSoundOn: false, caretStyle: "line", accent: "lime", isCoachOn: true, usesOnlinePacks: true },
     {
       keyProfiles: {}, bigramProfiles: {}, wordProfiles: {}, confusions: [], errorContexts: [],
       totalKeystrokes: 0, totalChars: 0, totalTests: 0, totalTimeMs: 0, lastVersion: 4,

@@ -147,7 +147,7 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
         errKeys: wordErrRef.current,
         // exact-match auto-finish is a complete word; a timer cutoff (or a
         // strict-mode length finish with junk) is truncated — not a review
-        partial: inputRef.current !== target,
+        isPartial: inputRef.current !== target,
       });
       typedWordsRef.current = [...typedWordsRef.current, inputRef.current];
       inputRef.current = "";
@@ -274,19 +274,19 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
       const target = test.words[typedWordsRef.current.length] ?? "";
       const pos = inputRef.current.length;
       const expected = pos < target.length ? target[pos] : null;
-      const correct = expected === ch;
+      const isCorrect = expected === ch;
 
       startIfIdle();
       const t = startedAtRef.current ? performance.now() - startedAtRef.current : 0;
-      eventsRef.current.push({ t, expected, typed: ch, correct });
+      eventsRef.current.push({ t, expected, typed: ch, isCorrect });
       countersRef.current.total += 1;
-      if (correct) countersRef.current.correct += 1;
+      if (isCorrect) countersRef.current.correct += 1;
       if (wordStartRef.current === null) wordStartRef.current = t; // first keystroke of this attempt
-      if (!correct) {
+      if (!isCorrect) {
         errorsThisSecondRef.current += 1;
         wordErrRef.current += 1;
       }
-      optsRef.current.onKeystroke?.(correct);
+      optsRef.current.onKeystroke?.(isCorrect);
 
       inputRef.current = inputRef.current + ch;
       setInput(inputRef.current);
@@ -297,7 +297,7 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
         if (next === target) {
           finishTest();
         } else if (
-          optsRef.current.settings.strictMode &&
+          optsRef.current.settings.isStrict &&
           next.length >= target.length &&
           test.timeLimit === null
         ) {
@@ -332,7 +332,7 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
     // record missed chars as silent error events for the learning engine
     if (typed.length < target.length) {
       for (let i = typed.length; i < target.length; i++) {
-        eventsRef.current.push({ t: nowT, expected: target[i], typed: "", correct: false });
+        eventsRef.current.push({ t: nowT, expected: target[i], typed: "", isCorrect: false });
       }
       countersRef.current.total += target.length - typed.length;
     }
@@ -341,7 +341,7 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
     // chain at word boundaries (the last char of the previous word and the
     // first char of this one were NEVER adjacent — a space sits between them)
     // and counts as the keystroke it is for accuracy/sound
-    eventsRef.current.push({ t: nowT, expected: " ", typed: " ", correct: true });
+    eventsRef.current.push({ t: nowT, expected: " ", typed: " ", isCorrect: true });
     countersRef.current.total += 1;
     countersRef.current.correct += 1;
     optsRef.current.onKeystroke?.(true);
@@ -358,7 +358,7 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
 
   const handleBackspace = useCallback(
     (ctrl: boolean) => {
-      if (statusRef.current === "done" || optsRef.current.settings.strictMode) return;
+      if (statusRef.current === "done" || optsRef.current.settings.isStrict) return;
       if (ctrl) {
         if (inputRef.current.length > 0) {
           inputRef.current = "";

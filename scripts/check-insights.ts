@@ -4,7 +4,7 @@
  * Run: bun scripts/check-insights.ts
  */
 import { generateInsights, nextTestPreview } from "../src/lib/typing/insights";
-import { emptyLearning } from "../src/lib/typing/profiles";
+import { createEmptyLearning } from "../src/lib/typing/profiles";
 import { newMemCard, reviewMem } from "../src/lib/typing/memory";
 import type { CharEvent, LearningData, Settings, StatsData, TestResult, WordProfile } from "../src/lib/typing/types";
 import { DEFAULT_SETTINGS } from "../src/lib/typing/types";
@@ -16,8 +16,8 @@ function profile(attempts: number, errRate: number, latency: number) {
   return { attempts, errors: Math.round(attempts * errRate), errRate, latency, lastSeen: Date.now(), mem };
 }
 
-function ev(t: number, expected: string | null, typed: string, correct: boolean): CharEvent {
-  return { t, expected, typed, correct };
+function ev(t: number, expected: string | null, typed: string, isCorrect: boolean): CharEvent {
+  return { t, expected, typed, isCorrect };
 }
 
 /** Type a word list into events; injects errors at the given global char indexes. */
@@ -74,7 +74,7 @@ function samples(instWpm: number[], errors: { second: number; errors: number }[]
   return out;
 }
 
-function baseResult(partial: Partial<TestResult>): TestResult {
+function baseResult(isPartial: Partial<TestResult>): TestResult {
   return {
     id: `probe-${Math.random().toString(36).slice(2, 8)}`,
     timestamp: Date.now(),
@@ -89,7 +89,7 @@ function baseResult(partial: Partial<TestResult>): TestResult {
     samples: [],
     focusKeys: [],
     isPersonalBest: false,
-    ...partial,
+    ...isPartial,
   };
 }
 
@@ -129,7 +129,7 @@ const sloppyResult = baseResult({
   focusKeys: ["e", "a"],
   isPersonalBest: false,
 });
-const sloppyLearning = emptyLearning();
+const sloppyLearning = createEmptyLearning();
 sloppyLearning.totalTests = 5;
 sloppyLearning.confusions.push({ expected: "e", typed: "r", count: 4, lastSeen: Date.now() });
 sloppyLearning.keyProfiles["e"] = profile(40, 0.09, 220);
@@ -147,7 +147,7 @@ const pbResult = baseResult({
   samples: samples(Array.from({ length: 30 }, () => 84), []),
   isPersonalBest: true,
 });
-show("clean PB", generateInsights(pbResult, [], baseStats(), emptyLearning(), DEFAULT_SETTINGS, { wpm: 76, accuracy: 97, timestamp: Date.now() - 8e6 }));
+show("clean PB", generateInsights(pbResult, [], baseStats(), createEmptyLearning(), DEFAULT_SETTINGS, { wpm: 76, accuracy: 97, timestamp: Date.now() - 8e6 }));
 
 // ---------------------------------------------------------------------------
 // Scenario 3 — cold start, first ever test
@@ -155,13 +155,13 @@ show("clean PB", generateInsights(pbResult, [], baseStats(), emptyLearning(), DE
 const firstResult = baseResult({ wpm: 41, rawWpm: 44, accuracy: 93.2, isPersonalBest: true, duration: 25 });
 show(
   "cold start (baseline + nudge)",
-  generateInsights(firstResult, [], baseStats(), emptyLearning(), { ...DEFAULT_SETTINGS, mode: "time" })
+  generateInsights(firstResult, [], baseStats(), createEmptyLearning(), { ...DEFAULT_SETTINGS, mode: "time" })
 );
 
 // ---------------------------------------------------------------------------
 // Scenario 4 — near-miss PB + slow keys + hesitation
 // ---------------------------------------------------------------------------
-const slowLearning = emptyLearning();
+const slowLearning = createEmptyLearning();
 slowLearning.totalTests = 9;
 slowLearning.keyProfiles["a"] = profile(120, 0.01, 150);
 slowLearning.keyProfiles["s"] = profile(110, 0.01, 155);
@@ -183,7 +183,7 @@ show(
 // ---------------------------------------------------------------------------
 // Scenario 5 — idle preview with due queue
 // ---------------------------------------------------------------------------
-const previewLearning = emptyLearning();
+const previewLearning = createEmptyLearning();
 previewLearning.totalTests = 6;
 previewLearning.keyProfiles["j"] = profile(50, 0.08, 240);
 previewLearning.keyProfiles["u"] = profile(55, 0.07, 235);
@@ -205,7 +205,7 @@ previewLearning.wordProfiles["quiet"] = dueWord();
 previewLearning.wordProfiles["onion"] = dueWord();
 console.log("\n=== idle preview (due queue) ===");
 console.log(nextTestPreview(previewLearning, "adaptive"));
-console.log(nextTestPreview(emptyLearning(), "adaptive"));
+console.log(nextTestPreview(createEmptyLearning(), "adaptive"));
 
 // ---------------------------------------------------------------------------
 // Sanity assertions

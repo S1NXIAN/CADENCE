@@ -9,9 +9,9 @@ import type {
 } from "./types";
 import {
   computeWeakKeys,
-  personalMedianLatency,
-  topErrorContexts,
-  weakBigrams,
+  calculateMedianLatency,
+  collectTopErrorContexts,
+  collectWeakBigrams,
 } from "./profiles";
 import { memRetrievability } from "./memory";
 import {
@@ -412,7 +412,7 @@ function confusionNote(c: DetectorCtx): Candidate | null {
 
 /** tip: trigram error context — the transition, not the key. */
 function transitionNote(c: DetectorCtx): Candidate | null {
-  const ctx = topErrorContexts(c.learning, 1)[0];
+  const ctx = collectTopErrorContexts(c.learning, 1)[0];
   if (!ctx) return null;
   const before = ctx.trigram.slice(0, 2);
   const target = ctx.trigram.slice(2);
@@ -430,7 +430,7 @@ function transitionNote(c: DetectorCtx): Candidate | null {
 /** tip: slowest keys THIS test vs personal baseline. */
 function slowKeysNote(c: DetectorCtx): Candidate | null {
   const { ev, learning } = c;
-  const median = personalMedianLatency(learning) || 150;
+  const median = calculateMedianLatency(learning) || 150;
   const ranked: Array<{ key: string; ms: number; ratio: number }> = [];
   for (const [key, arr] of ev.latencies) {
     if (arr.length < 3) continue;
@@ -658,7 +658,7 @@ export function nextTestPreview(learning: LearningData, mode: string): string {
     return "Your first test calibrates the coach. From test 2 onward, every word is chosen for you.";
   }
   const weak = computeWeakKeys(learning).filter((w) => w.weakness > 0.08).slice(0, 2);
-  const bgs = weakBigrams(learning, 3).filter((b) => b.weakness > 0.08).slice(0, 2);
+  const bgs = collectWeakBigrams(learning, 3).filter((b) => b.weakness > 0.08).slice(0, 2);
 
   const horizon = Date.now() + 48 * 3600 * 1000;
   let due = 0;

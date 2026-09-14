@@ -50,8 +50,8 @@ interface SubOptionsProps {
   mode: TestMode;
   timeDuration: number;
   wordCount: number;
-  punctuation: boolean;
-  numbers: boolean;
+  hasPunctuation: boolean;
+  hasNumbers: boolean;
   adaptiveIntensity: number;
   onSelectTime: (seconds: number) => void;
   onSelectWordCount: (count: number) => void;
@@ -66,8 +66,8 @@ export const SubOptions = memo(function SubOptions({
   mode,
   timeDuration,
   wordCount,
-  punctuation,
-  numbers,
+  hasPunctuation,
+  hasNumbers,
   adaptiveIntensity,
   onSelectTime,
   onSelectWordCount,
@@ -105,13 +105,13 @@ export const SubOptions = memo(function SubOptions({
       )}
       <button
         onClick={onTogglePunctuation}
-        className={`inline-flex items-center gap-1 transition-colors ${punctuation ? "text-hue" : "text-faint hover:text-foreground"}`}
+        className={`inline-flex items-center gap-1 transition-colors ${hasPunctuation ? "text-hue" : "text-faint hover:text-foreground"}`}
       >
         <AtSign className="h-3 w-3" /> punctuation
       </button>
       <button
         onClick={onToggleNumbers}
-        className={`inline-flex items-center gap-1 transition-colors ${numbers ? "text-hue" : "text-faint hover:text-foreground"}`}
+        className={`inline-flex items-center gap-1 transition-colors ${hasNumbers ? "text-hue" : "text-faint hover:text-foreground"}`}
       >
         <Hash className="h-3 w-3" /> numbers
       </button>

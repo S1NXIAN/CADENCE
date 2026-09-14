@@ -15,10 +15,11 @@
  */
 import {
   normalizeWordKey, expectedWordMs, ingestWordOutcomes, finalizeWordReviews,
-  wordUrgencies, pickReviewWords, worstWords, fastestWords, dueWords, MIN_REVIEW_URGENCY,
+  calculateWordUrgencies, pickReviewWords, collectWorstWords, collectFastestWords, collectDueWords, MIN_REVIEW_URGENCY,
 } from "../src/lib/typing/word-scheduler";
-import { emptyLearning, ingestEvents, finalizeLearning } from "../src/lib/typing/profiles";
-import { sanitizeLearning, exportData, importData } from "../src/lib/typing/storage";
+import { createEmptyLearning, ingestEvents, finalizeLearning } from "../src/lib/typing/profiles";
+import { exportData, importData } from "../src/lib/typing/storage";
+import { sanitizeLearning } from "../src/lib/typing/sanitize";
 import type { LearningData, WordOutcome } from "../src/lib/typing/types";
 
 let failures = 0;
@@ -44,7 +45,7 @@ check("normalize: plain word unchanged", normalizeWordKey("island") === "island"
 // ---------------------------------------------------------------------------
 // 2. expectedWordMs
 // ---------------------------------------------------------------------------
-const fresh = emptyLearning();
+const fresh = createEmptyLearning();
 const medianCold = 0; // no personal data yet
 const msIii = expectedWordMs("iii", fresh, medianCold);
 const msThe = expectedWordMs("the", fresh, medianCold);
@@ -56,7 +57,7 @@ check("expected 'iii' < 5-letter alternate word", msIii < expectedWordMs("rover"
   `${msIii.toFixed(0)} vs ${expectedWordMs("rover", fresh, medianCold).toFixed(0)}`);
 // personal data uptake: a fast observed 'h' latency lowers 'the' expectation
 // (the model reads the SECOND char of each transition: t→h, h→e)
-const learned = emptyLearning();
+const learned = createEmptyLearning();
 learned.keyProfiles["h"] = { attempts: 50, errors: 1, errRate: 0.02, latency: 70, lastSeen: 1, mem: null };
 const msTheLearned = expectedWordMs("the", learned, 200);
 check("expected uses personal key latency", msTheLearned < msThe, `${msTheLearned.toFixed(0)} vs ${msThe.toFixed(0)}`);
@@ -64,14 +65,14 @@ check("expected uses personal key latency", msTheLearned < msThe, `${msTheLearne
 // ---------------------------------------------------------------------------
 // 3. ingest + finalize
 // ---------------------------------------------------------------------------
-const L = emptyLearning();
+const L = createEmptyLearning();
 const outcomes: WordOutcome[] = [
   { target: "the", typed: "the", ms: 800, errKeys: 0 },            // clean slow -> hard
   { target: "because", typed: "becuase", ms: 900, errKeys: 2 },    // failed -> again
   { target: "cat", typed: "cat", ms: 250, errKeys: 0 },            // clean fast, first sight -> capped good
   { target: "The,", typed: "The,", ms: 420, errKeys: 0 },          // same word (normalized) again
   { target: "1234", typed: "1234", ms: 300, errKeys: 0 },          // number: skipped
-  { target: "house", typed: "hous", ms: 500, errKeys: 0, partial: true }, // truncated: skipped
+  { target: "house", typed: "hous", ms: 500, errKeys: 0, isPartial: true }, // truncated: skipped
 ];
 const wt = ingestWordOutcomes(L, outcomes);
 check("tally: 3 unique words", wt.entries.size === 3, [...wt.entries.keys()].join(","));
@@ -108,17 +109,17 @@ check("mem: 'cat' second fast clean review -> stability jump (easy)", memCat2.re
 // ---------------------------------------------------------------------------
 // 'cat' now easy & just reviewed -> urgency below the serving floor
 // 'because' failed ~3 min ago -> learning step elapsed -> due & hot
-const L3 = emptyLearning();
+const L3 = createEmptyLearning();
 L3.wordProfiles["calm"] = { attempts: 10, errors: 0, bestWpm: 110, lastSeen: Date.now(), mem: null };
 const wtc = ingestWordOutcomes(L3, [{ target: "calm", typed: "calm", ms: 250, errKeys: 0 }]);
 finalizeWordReviews(L3, wtc);
 finalizeWordReviews(L3, ingestWordOutcomes(L3, [{ target: "calm", typed: "calm", ms: 240, errKeys: 0 }]));
-const urgCalm = wordUrgencies(L3).find((u) => u.word === "calm")!;
+const urgCalm = calculateWordUrgencies(L3).find((u) => u.word === "calm")!;
 check("suspension: freshly mastered word urgency below floor", urgCalm.urgency < MIN_REVIEW_URGENCY,
   `u=${urgCalm.urgency.toFixed(3)} floor=${MIN_REVIEW_URGENCY}`);
 check("suspension: mastered word retrievability high", urgCalm.retrievability > 0.9, `R=${urgCalm.retrievability.toFixed(3)}`);
 
-const L4 = emptyLearning();
+const L4 = createEmptyLearning();
 L4.wordProfiles["gauge"] = { attempts: 6, errors: 4, bestWpm: null, lastSeen: Date.now(), mem: null };
 const wtg = ingestWordOutcomes(L4, [{ target: "gauge", typed: "guage", ms: 900, errKeys: 1 }]);
 finalizeWordReviews(L4, wtg);
@@ -126,15 +127,15 @@ finalizeWordReviews(L4, wtg);
 const memG = L4.wordProfiles["gauge"]!.mem!;
 memG.last = Date.now() - 180_000;
 memG.due = Date.now() - 120_000;
-const urgGauge = wordUrgencies(L4).find((u) => u.word === "gauge")!;
+const urgGauge = calculateWordUrgencies(L4).find((u) => u.word === "gauge")!;
 check("resurfacing: failed word hot after learning step", urgGauge.urgency >= MIN_REVIEW_URGENCY,
   `u=${urgGauge.urgency.toFixed(3)}`);
 check("resurfacing: failed word overdue", urgGauge.dueInMs !== null && urgGauge.dueInMs < 0);
 
 // never-reviewed word: low urgency regardless of habit (can't be 'due' unseen)
-const L5 = emptyLearning();
+const L5 = createEmptyLearning();
 L5.wordProfiles["quirk"] = { attempts: 2, errors: 2, bestWpm: null, lastSeen: Date.now(), mem: null };
-const urgQuirk = wordUrgencies(L5).find((u) => u.word === "quirk")!;
+const urgQuirk = calculateWordUrgencies(L5).find((u) => u.word === "quirk")!;
 check("cold word (no reviews): low urgency", urgQuirk.urgency < MIN_REVIEW_URGENCY, `u=${urgQuirk.urgency.toFixed(3)}`);
 
 // ---------------------------------------------------------------------------
@@ -147,7 +148,7 @@ check("serving: respects cap", pickReviewWords(L4, pool, 0).length === 0);
 const poolNoGauge = new Set(["calm"]);
 check("serving: pool filter excludes off-pool words", pickReviewWords(L4, poolNoGauge, 5).length === 0);
 const LETTERS = "abcdefghijkl";
-const many: LearningData = emptyLearning();
+const many: LearningData = createEmptyLearning();
 for (let i = 0; i < 12; i++) {
   const w = `word${LETTERS[i]}`; // letters only — digits are not trackable words
   many.wordProfiles[w] = { attempts: 5, errors: 3, bestWpm: null, lastSeen: Date.now(), mem: null };
@@ -162,26 +163,26 @@ check("serving: max bounds the queue", pickReviewWords(many, new Set(Object.keys
 // ---------------------------------------------------------------------------
 // 6. rankings
 // ---------------------------------------------------------------------------
-const worst = worstWords(L4, 5);
+const worst = collectWorstWords(L4, 5);
 check("worst: 'gauge' ranked first", worst[0]?.word === "gauge", worst.map((w) => w.word).join(","));
 check("worst: fresh 'calm' not listed (L4 lacks it)", !worst.some((w) => w.word === "calm"));
-const fastest = fastestWords(L3, 5);
+const fastest = collectFastestWords(L3, 5);
 check("fastest: 'calm' ranked first with bestWpm", fastest[0]?.word === "calm" && (fastest[0]?.bestWpm ?? 0) > 100,
   fastest.map((w) => `${w.word}:${w.bestWpm?.toFixed(0)}`).join(","));
-const due = dueWords(L4, 5);
+const due = collectDueWords(L4, 5);
 check("due: failed word queued", due.some((w) => w.word === "gauge"));
 check("due: mastered 'calm' not queued (L4 lacks it)", !due.some((w) => w.word === "calm"));
 
 // needs >=3 attempts to rank
-const L6 = emptyLearning();
+const L6 = createEmptyLearning();
 L6.wordProfiles["hi"] = { attempts: 2, errors: 2, bestWpm: null, lastSeen: Date.now(), mem: null };
-check("rank floor: <3 attempts excluded from worst", worstWords(L6).length === 0);
+check("rank floor: <3 attempts excluded from worst", collectWorstWords(L6).length === 0);
 
 // ---------------------------------------------------------------------------
 // 7. sanitizeLearning + round-trip
 // ---------------------------------------------------------------------------
 const junk = sanitizeLearning({
-  ...emptyLearning(),
+  ...createEmptyLearning(),
   wordProfiles: {
     Good: { attempts: 2, errors: 1, bestWpm: 80, lastSeen: 5, mem: null },          // uppercase key dropped
     "x": { attempts: "9", errors: 0, bestWpm: null, lastSeen: 5 },                  // non-numeric attempts
@@ -203,12 +204,12 @@ for (let i = 0; i < 4100; i++) {
   const recent = i >= 100;
   ceiling[ceilKey(i)] = { attempts: 1, errors: 0, bestWpm: null, lastSeen: recent ? Date.now() + i : 1, mem: null };
 }
-const cappedOut = sanitizeLearning({ ...emptyLearning(), wordProfiles: ceiling });
+const cappedOut = sanitizeLearning({ ...createEmptyLearning(), wordProfiles: ceiling });
 check("ceiling: capped to 4000", Object.keys(cappedOut.wordProfiles).length === 4000, String(Object.keys(cappedOut.wordProfiles).length));
 check("ceiling: keeps recent over stale", cappedOut.wordProfiles[ceilKey(4099)] !== undefined && cappedOut.wordProfiles[ceilKey(0)] === undefined);
 
 // export/import round-trip preserves word memory
-const rt = importData(exportData({ ...emptyLearning, ...{} } as never, L4, {
+const rt = importData(exportData({ ...createEmptyLearning, ...{} } as never, L4, {
   history: [], personalBests: {}, dailyActivity: {}, streakDays: 0, lastTestDay: "", firstTestDay: null,
 }));
 check("round-trip: wordProfiles survive export/import", JSON.stringify(rt?.learning.wordProfiles) === JSON.stringify(L4.wordProfiles));
@@ -218,7 +219,7 @@ check("round-trip: wordProfiles survive export/import", JSON.stringify(rt?.learn
 // ---------------------------------------------------------------------------
 import { generateAdaptive } from "../src/lib/typing/generator";
 import { reviewMem, newMemCard } from "../src/lib/typing/memory";
-const LI: LearningData = emptyLearning();
+const LI: LearningData = createEmptyLearning();
 LI.totalTests = 5;
 // give the key layer some signal so hasSignal is true
 LI.keyProfiles["q"] = { attempts: 40, errors: 12, errRate: 0.3, latency: 260, lastSeen: 1, mem: null };

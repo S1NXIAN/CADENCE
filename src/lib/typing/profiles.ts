@@ -27,7 +27,7 @@ const PRIOR_K_LAT = 6;
 // The recent-error EWMA signal only earns trust with this many attempts.
 const EWMA_CONF_ATTEMPTS = 8;
 
-export function emptyLearning(): LearningData {
+export function createEmptyLearning(): LearningData {
   return {
     keyProfiles: {},
     bigramProfiles: {},
@@ -190,8 +190,8 @@ export function ingestEvents(learning: LearningData, events: CharEvent[], durati
 
   for (const ev of events) {
     learning.totalKeystrokes += 1;
-    if (ev.correct) correctCount += 1;
-    const delta = ev.correct && prevTime !== null && ev.t - prevTime > 20 && ev.t - prevTime < MAX_LATENCY_SAMPLE
+    if (ev.isCorrect) correctCount += 1;
+    const delta = ev.isCorrect && prevTime !== null && ev.t - prevTime > 20 && ev.t - prevTime < MAX_LATENCY_SAMPLE
       ? ev.t - prevTime
       : null;
 
@@ -200,7 +200,7 @@ export function ingestEvents(learning: LearningData, events: CharEvent[], durati
       kp.attempts += 1;
       kp.lastSeen = Date.now();
 
-      if (ev.correct) {
+      if (ev.isCorrect) {
         if (delta !== null) {
           kp.latency = kp.latency === null ? delta : kp.latency * (1 - LATENCY_ALPHA) + delta * LATENCY_ALPHA;
         }
@@ -213,7 +213,7 @@ export function ingestEvents(learning: LearningData, events: CharEvent[], durati
     }
 
     // error attribution: the key you WERE SUPPOSED to press gets the blame
-    if (ev.expected && !ev.correct && isTrackedKey(ev.expected)) {
+    if (ev.expected && !ev.isCorrect && isTrackedKey(ev.expected)) {
       const exp = ev.expected.toLowerCase();
       const kp = ensureKey(learning.keyProfiles, exp);
       kp.errors += 1;
@@ -225,7 +225,7 @@ export function ingestEvents(learning: LearningData, events: CharEvent[], durati
     // bigram transition: prev -> (typed when correct, expected when not).
     // This is the KEY COMBINATION model: latency when clean, error-rate always,
     // so combinations that fall apart under your fingers show up here.
-    const transitionEnd = ev.correct ? ev.typed : ev.expected;
+    const transitionEnd = ev.isCorrect ? ev.typed : ev.expected;
     if (
       prevTyped &&
       isTrackedKey(prevTyped) &&
@@ -236,7 +236,7 @@ export function ingestEvents(learning: LearningData, events: CharEvent[], durati
       const bp = ensureBigram(learning.bigramProfiles, bg);
       bp.attempts += 1;
       bp.lastSeen = Date.now();
-      if (ev.correct) {
+      if (ev.isCorrect) {
         if (delta !== null) {
           bp.latency = bp.latency === null ? delta : bp.latency * (1 - LATENCY_ALPHA) + delta * LATENCY_ALPHA;
         }
@@ -258,7 +258,7 @@ export function ingestEvents(learning: LearningData, events: CharEvent[], durati
     }
 
     // trigram error context: the 2 keys pressed immediately BEFORE the mistake
-    if (ev.expected && !ev.correct && isTrackedKey(ev.expected) && lastPressed.length === 2) {
+    if (ev.expected && !ev.isCorrect && isTrackedKey(ev.expected) && lastPressed.length === 2) {
       const tri = (lastPressed[0] + lastPressed[1] + ev.expected).toLowerCase();
       recordErrorContext(learning, contextIndex, tri);
     }
@@ -279,7 +279,7 @@ export function ingestEvents(learning: LearningData, events: CharEvent[], durati
 }
 
 /** Median observed inter-key latency across all tracked items (0 if none). */
-export function personalMedianLatency(learning: LearningData): number {
+export function calculateMedianLatency(learning: LearningData): number {
   const latencies: number[] = [];
   for (const p of Object.values(learning.keyProfiles)) {
     if (p.latency !== null) latencies.push(p.latency);
@@ -314,7 +314,7 @@ function gradeTally(t: Tally, avgLatRatio: number | null, hasHistory: boolean): 
 export function finalizeLearning(learning: LearningData, tally?: ReviewTally): void {
   if (tally) {
     const now = Date.now();
-    const median = personalMedianLatency(learning);
+    const median = calculateMedianLatency(learning);
 
     for (const [ch, t] of tally.keys) {
       const kp = ensureKey(learning.keyProfiles, ch);
@@ -368,9 +368,9 @@ function shrunkErrRate(errors: number, attempts: number, priorErr: number): numb
   return (errors + PRIOR_K_ERR * priorErr) / (attempts + PRIOR_K_ERR);
 }
 
-export function keyUrgencies(learning: LearningData): UrgentKey[] {
+export function calculateKeyUrgencies(learning: LearningData): UrgentKey[] {
   const now = Date.now();
-  const median = personalMedianLatency(learning) || PRIOR_BASE_LAT + 15;
+  const median = calculateMedianLatency(learning) || PRIOR_BASE_LAT + 15;
   const out: UrgentKey[] = [];
 
   for (const [key, p] of Object.entries(learning.keyProfiles)) {
@@ -415,9 +415,9 @@ export interface UrgentBigram {
   retrievability: number;
 }
 
-export function bigramUrgencies(learning: LearningData): UrgentBigram[] {
+export function calculateBigramUrgencies(learning: LearningData): UrgentBigram[] {
   const now = Date.now();
-  const median = personalMedianLatency(learning) || PRIOR_BASE_LAT + 15;
+  const median = calculateMedianLatency(learning) || PRIOR_BASE_LAT + 15;
   const out: UrgentBigram[] = [];
 
   for (const [bg, p] of Object.entries(learning.bigramProfiles)) {
@@ -456,7 +456,7 @@ export function computeWeakKeys(
   pool: string[] = Object.keys(learning.keyProfiles)
 ): WeakKey[] {
   const poolSet = new Set(pool);
-  return keyUrgencies(learning)
+  return calculateKeyUrgencies(learning)
     .filter((u) => poolSet.has(u.key))
     .map((u) => ({
       key: u.key,
@@ -471,8 +471,8 @@ export function computeWeakKeys(
  * Weak bigram transitions, ranked by urgency (FSRS decay + prior-shrunk
  * errors/latency). This is how the coach knows WHICH key combinations need work.
  */
-export function weakBigrams(learning: LearningData, topN = 8): WeakBigram[] {
-  return bigramUrgencies(learning)
+export function collectWeakBigrams(learning: LearningData, topN = 8): WeakBigram[] {
+  return calculateBigramUrgencies(learning)
     .slice(0, topN)
     .map((u) => {
       const p = learning.bigramProfiles[u.bigram];
@@ -487,14 +487,14 @@ export function weakBigrams(learning: LearningData, topN = 8): WeakBigram[] {
 }
 
 /** Trigram contexts where errors cluster: the 2 keys before a mistake + the fumbled key. */
-export function topErrorContexts(learning: LearningData, topN = 3): ErrorContext[] {
+export function collectTopErrorContexts(learning: LearningData, topN = 3): ErrorContext[] {
   return [...learning.errorContexts]
     .filter((c) => c.count >= 2)
     .sort((a, b) => b.count - a.count)
     .slice(0, topN);
 }
 
-export function topConfusions(learning: LearningData, topN = 5): ConfusionPair[] {
+export function collectTopConfusions(learning: LearningData, topN = 5): ConfusionPair[] {
   return [...learning.confusions]
     .filter((c) => c.count >= 2)
     .sort((a, b) => b.count - a.count)

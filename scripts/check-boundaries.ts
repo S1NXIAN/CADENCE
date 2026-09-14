@@ -8,8 +8,8 @@
  * 3. Sanitizers survive poisoned payloads: latency 1e300, PB wpm Infinity,
  *    memory card last:0, junk confusion/context entries.
  */
-import { emptyLearning, ingestEvents, finalizeLearning } from "../src/lib/typing/profiles";
-import { sanitizeLearning, sanitizeStats } from "../src/lib/typing/storage";
+import { createEmptyLearning, ingestEvents, finalizeLearning } from "../src/lib/typing/profiles";
+import { sanitizeLearning, sanitizeStats } from "../src/lib/typing/sanitize";
 import { memRetrievability } from "../src/lib/typing/memory";
 import type { CharEvent, LearningData } from "../src/lib/typing/types";
 
@@ -29,16 +29,16 @@ function typeEvents(words: string[]): CharEvent[] {
   let t = 0;
   words.forEach((w, wi) => {
     if (wi > 0) {
-      evs.push({ t: (t += 80), expected: " ", typed: " ", correct: true });
+      evs.push({ t: (t += 80), expected: " ", typed: " ", isCorrect: true });
     }
     for (const ch of w) {
-      evs.push({ t: (t += 120), expected: ch, typed: ch, correct: true });
+      evs.push({ t: (t += 120), expected: ch, typed: ch, isCorrect: true });
     }
   });
   return evs;
 }
 
-const learning: LearningData = emptyLearning();
+const learning: LearningData = createEmptyLearning();
 const evs = typeEvents(["he", "is", "so"]);
 const tally = ingestEvents(learning, evs, 3000);
 finalizeLearning(learning, tally);
@@ -53,7 +53,7 @@ check("space not in FSRS tally", !tally.keys.has(" ") && !tally.bigrams.has(" e"
 
 // accuracy math (same formula as finishTest): spaces are correct keystrokes
 const total = evs.length;
-const correct = evs.filter((e) => e.correct).length;
+const correct = evs.filter((e) => e.isCorrect).length;
 check("accuracy includes spaces", total === 8 && correct === 8, `${correct}/${total}`);
 
 // ---------------------------------------------------------------------------

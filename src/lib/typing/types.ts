@@ -6,16 +6,16 @@ export interface Settings {
   mode: TestMode;
   timeDuration: number; // seconds
   wordCount: number;
-  punctuation: boolean;
-  numbers: boolean;
+  hasPunctuation: boolean;
+  hasNumbers: boolean;
   adaptiveIntensity: number; // 0..100 — how aggressively tests target weak keys
-  strictMode: boolean; // no backspace — forces accuracy
-  liveWpm: boolean;
-  sound: boolean;
+  isStrict: boolean; // no backspace — forces accuracy
+  isLiveWpmOn: boolean;
+  isSoundOn: boolean;
   caretStyle: CaretStyle;
   accent: "lime" | "amber" | "cyan" | "rose";
-  showCoach: boolean;
-  onlinePacks: boolean; // when online: fetch + cache extra word/quote packs (full-potential layer)
+  isCoachOn: boolean;
+  usesOnlinePacks: boolean; // when online: fetch + cache extra word/quote packs (full-potential layer)
 }
 
 /**
@@ -42,7 +42,7 @@ export interface CharEvent {
   t: number; // ms since session start
   expected: string | null; // target char (null = extra char typed)
   typed: string; // what was actually pressed
-  correct: boolean;
+  isCorrect: boolean;
 }
 
 export interface SecondSample {
@@ -95,7 +95,7 @@ export interface BigramProfile {
  *             when the attempt produced no keystrokes
  *   errKeys — wrong keystrokes during the attempt, INCLUDING ones the user
  *             later backspaced away (a recovered slip still happened)
- *   partial — attempt truncated by the timer (time mode) or finished with
+ *   isPartial — attempt truncated by the timer (time mode) or finished with
  *             junk; skipped by the scheduler entirely
  */
 export interface WordOutcome {
@@ -103,7 +103,7 @@ export interface WordOutcome {
   typed: string; // final committed text
   ms: number | null;
   errKeys: number;
-  partial?: boolean;
+  isPartial?: boolean;
 }
 
 /**
@@ -220,14 +220,14 @@ export const DEFAULT_SETTINGS: Settings = {
   mode: "adaptive",
   timeDuration: 30,
   wordCount: 25,
-  punctuation: false,
-  numbers: false,
+  hasPunctuation: false,
+  hasNumbers: false,
   adaptiveIntensity: 65,
-  strictMode: false,
-  liveWpm: true,
-  sound: false,
+  isStrict: false,
+  isLiveWpmOn: true,
+  isSoundOn: false,
   caretStyle: "line",
   accent: "lime",
-  showCoach: true,
-  onlinePacks: true,
+  isCoachOn: true,
+  usesOnlinePacks: true,
 };

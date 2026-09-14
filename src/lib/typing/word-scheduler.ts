@@ -37,7 +37,7 @@
 import type { LearningData, WordOutcome } from "./types";
 import { isWordImperfect } from "./diff";
 import { newMemCard, reviewMem, memRetrievability, type GradeName } from "./memory";
-import { effLatency, personalMedianLatency } from "./profiles";
+import { effLatency, calculateMedianLatency } from "./profiles";
 import { classifyBigram, keyPrior, PRIOR_BASE_LAT } from "./motor";
 
 const WORD_KEY_RE = /^[a-z][a-z'-]{0,15}$/;
@@ -138,7 +138,7 @@ export function ingestWordOutcomes(learning: LearningData, outcomes: WordOutcome
   const now = Date.now();
 
   for (const o of outcomes) {
-    if (o.partial) continue;
+    if (o.isPartial) continue;
     const key = normalizeWordKey(o.target);
     if (!key) continue;
     const perfect = !isWordImperfect(o.target, o.typed);
@@ -189,7 +189,7 @@ function gradeWord(entry: { occ: WordOccurrence[] }, expectedMs: number, hasHist
 export function finalizeWordReviews(learning: LearningData, tally: WordReviewTally | null | undefined): void {
   if (!tally || tally.entries.size === 0) return;
   const now = Date.now();
-  const median = personalMedianLatency(learning);
+  const median = calculateMedianLatency(learning);
   for (const [key, entry] of tally.entries) {
     try {
       const wp = learning.wordProfiles[key];
@@ -224,13 +224,13 @@ function shrunkErrRate(errors: number, attempts: number): number {
 }
 
 /**
- * Urgency of every tracked word, sorted descending. Mirrors keyUrgencies:
+ * Urgency of every tracked word, sorted descending. Mirrors calculateKeyUrgencies:
  * FSRS retrievability decay is the heartbeat, chronic error habit keeps
  * stubborn words hot, FSRS difficulty adds a residual pull.
  * Never-reviewed words start at ~0 — a word can't be "due" before it has
  * been seen; it enters rotation naturally via flow/cover.
  */
-export function wordUrgencies(learning: LearningData, now = Date.now()): UrgentWord[] {
+export function calculateWordUrgencies(learning: LearningData, now = Date.now()): UrgentWord[] {
   const out: UrgentWord[] = [];
   for (const [word, p] of Object.entries(learning.wordProfiles)) {
     const R = p.mem ? memRetrievability(p.mem, now) : 0;
@@ -261,7 +261,7 @@ export function wordUrgencies(learning: LearningData, now = Date.now()): UrgentW
  */
 export function pickReviewWords(learning: LearningData, pool: Set<string>, max: number, now = Date.now()): string[] {
   if (max <= 0) return [];
-  const urgent = wordUrgencies(learning, now).filter((u) => u.urgency >= MIN_REVIEW_URGENCY && pool.has(u.word));
+  const urgent = calculateWordUrgencies(learning, now).filter((u) => u.urgency >= MIN_REVIEW_URGENCY && pool.has(u.word));
   if (!urgent.length) return [];
   const jittered = urgent.map((u) => ({ word: u.word, j: u.urgency * (0.75 + Math.random() * 0.5) }));
   jittered.sort((a, b) => b.j - a.j);
@@ -269,22 +269,22 @@ export function pickReviewWords(learning: LearningData, pool: Set<string>, max: 
 }
 
 /** Words the user keeps getting wrong (error rate first, then volume). */
-export function worstWords(learning: LearningData, n = 8): UrgentWord[] {
-  return wordUrgencies(learning)
+export function collectWorstWords(learning: LearningData, n = 8): UrgentWord[] {
+  return calculateWordUrgencies(learning)
     .filter((u) => u.attempts >= MIN_RANK_ATTEMPTS && u.errRate > 0)
     .sort((a, b) => b.errRate - a.errRate || b.errors - a.errors || b.urgency - a.urgency)
     .slice(0, n);
 }
 
 /** Clean quick wins — best wpm on a perfect attempt, mostly-clean records only. */
-export function fastestWords(learning: LearningData, n = 8): UrgentWord[] {
-  return wordUrgencies(learning)
+export function collectFastestWords(learning: LearningData, n = 8): UrgentWord[] {
+  return calculateWordUrgencies(learning)
     .filter((u) => u.attempts >= MIN_RANK_ATTEMPTS && u.bestWpm !== null && u.errRate < 0.15)
     .sort((a, b) => (b.bestWpm ?? 0) - (a.bestWpm ?? 0))
     .slice(0, n);
 }
 
 /** What the review queue will serve next (highest urgency first). */
-export function dueWords(learning: LearningData, n = 6): UrgentWord[] {
-  return wordUrgencies(learning).filter((u) => u.urgency >= MIN_REVIEW_URGENCY).slice(0, n);
+export function collectDueWords(learning: LearningData, n = 6): UrgentWord[] {
+  return calculateWordUrgencies(learning).filter((u) => u.urgency >= MIN_REVIEW_URGENCY).slice(0, n);
 }

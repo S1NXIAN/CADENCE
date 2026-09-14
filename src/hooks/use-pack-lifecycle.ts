@@ -8,7 +8,7 @@ import {
 
 interface PackLifecycleOpts {
   ready: boolean;
-  /** settings.onlinePacks — the "full potential" toggle */
+  /** settings.usesOnlinePacks — the "full potential" toggle */
   enabled: boolean;
   /** lets pack arrival restart an idle test; the ref avoids re-subscribing */
   sessionRef: RefObject<{ status: string; restart: () => void }>;

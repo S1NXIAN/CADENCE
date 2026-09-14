@@ -3,10 +3,10 @@
  * Verifies the behavioral guarantees of Adaptive Engine v2 without a browser.
  * Run: bun scripts/fsrs-sanity.ts
  */
-import { emptyLearning, ingestEvents, finalizeLearning, keyUrgencies, bigramUrgencies, type ReviewTally } from "../src/lib/typing/profiles";
+import { createEmptyLearning, ingestEvents, finalizeLearning, calculateKeyUrgencies, calculateBigramUrgencies, type ReviewTally } from "../src/lib/typing/profiles";
 import { newMemCard, reviewMem, memRetrievability } from "../src/lib/typing/memory";
 import { keyPrior, classifyBigram } from "../src/lib/typing/motor";
-import { sanitizeLearning } from "../src/lib/typing/storage";
+import { sanitizeLearning } from "../src/lib/typing/sanitize";
 import type { CharEvent } from "../src/lib/typing/types";
 
 let checks = 0;
@@ -91,11 +91,11 @@ function events(list: Array<[string, string, boolean]>): CharEvent[] {
   let t = 0;
   return list.map(([expected, typed, correct]) => {
     t += 150 + Math.floor(Math.random() * 60);
-    return { t, expected, typed, correct } as CharEvent;
+    return { t, expected, typed, isCorrect: correct } as CharEvent;
   });
 }
 
-const learning = emptyLearning();
+const learning = createEmptyLearning();
 // a test where 'q' is typed cleanly, 'z' is fumbled twice
 const evs: CharEvent[] = [
   ...events([["t", "t", true], ["h", "h", true], ["e", "e", true]]),
@@ -107,7 +107,7 @@ const tally: ReviewTally = ingestEvents(learning, evs, 30000);
 finalizeLearning(learning, tally);
 check("test 1: z has high urgency, t low", true); // placeholder replaced below
 
-const urg1 = keyUrgencies(learning);
+const urg1 = calculateKeyUrgencies(learning);
 const urgZ = urg1.find((u) => u.key === "z");
 const urgT = urg1.find((u) => u.key === "t");
 const urgQ = urg1.find((u) => u.key === "q");
@@ -117,20 +117,20 @@ check("clean-but-pinky 'q' carries some urgency via memory decay only",
   (urgQ?.urgency ?? 0) < (urgZ?.urgency ?? 0));
 
 // same clean performance on z vs q -> z (bottom-row pinky prior) ranks higher when unpracticed
-const fresh = emptyLearning();
+const fresh = createEmptyLearning();
 const evs2: CharEvent[] = [
   ...events([["z", "z", true], ["e", "e", true]]),
   ...events([["q", "q", true], ["u", "u", true]]),
 ];
 finalizeLearning(fresh, ingestEvents(fresh, evs2, 5000));
-const urg2 = keyUrgencies(fresh);
+const urg2 = calculateKeyUrgencies(fresh);
 const zU = urg2.find((u) => u.key === "z");
 const qU = urg2.find((u) => u.key === "q");
 check("identical clean reps: pinky-bottom 'z' > pinky-top 'q' (prior tiebreak)", (zU?.urgency ?? 0) > (qU?.urgency ?? 0),
   `z=${zU?.urgency.toFixed(3)} q=${qU?.urgency.toFixed(3)}`);
 
 // bigram urgency surfaces the failing transition
-const bgU = bigramUrgencies(learning);
+const bgU = calculateBigramUrgencies(learning);
 check("transition urgency exists", bgU.length > 0, `top=${bgU[0]?.bigram}`);
 
 // ---------------------------------------------------------------------------
@@ -171,14 +171,14 @@ check("v2 migration: lifetime errors inferred", migrated.keyProfiles["q"]!.error
 // 5. Urgency timing: decayed keys resurface
 // ---------------------------------------------------------------------------
 console.log("\n== decay resurfacing ==");
-const decayed = emptyLearning();
+const decayed = createEmptyLearning();
 const evs3: CharEvent[] = events([["k", "k", true], ["e", "e", true], ["n", "n", true]]);
 finalizeLearning(decayed, ingestEvents(decayed, evs3, 4000));
 // age the memory state by 90 days (simulate: rewrite last/due)
 const km = decayed.keyProfiles["k"]!.mem!;
 km.last = (km.last ?? Date.now()) - 90 * day;
 km.due = (km.due) - 90 * day;
-const urgDecayed = keyUrgencies(decayed).find((u) => u.key === "k");
+const urgDecayed = calculateKeyUrgencies(decayed).find((u) => u.key === "k");
 check("long-unpracticed key resurfaces with meaningful urgency", (urgDecayed?.urgency ?? 0) > 0.6,
   `k urgency after 90d = ${urgDecayed?.urgency.toFixed(2)} (R=${urgDecayed?.retrievability.toFixed(2)})`);
 

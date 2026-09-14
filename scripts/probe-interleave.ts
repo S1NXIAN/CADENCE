@@ -14,23 +14,23 @@
  * Run: bun scripts/probe-interleave.ts
  */
 import { generateTest, generateAdaptive } from "../src/lib/typing/generator";
-import { emptyLearning, ingestEvents, finalizeLearning, keyUrgencies, bigramUrgencies } from "../src/lib/typing/profiles";
+import { createEmptyLearning, ingestEvents, finalizeLearning, calculateKeyUrgencies, calculateBigramUrgencies } from "../src/lib/typing/profiles";
 import type { Settings, LearningData, CharEvent } from "../src/lib/typing/types";
 
 const settings: Settings = {
   mode: "adaptive",
   timeDuration: 30,
   wordCount: 25,
-  punctuation: false,
-  numbers: false,
+  hasPunctuation: false,
+  hasNumbers: false,
   adaptiveIntensity: 65,
-  strictMode: false,
-  liveWpm: true,
-  sound: false,
+  isStrict: false,
+  isLiveWpmOn: true,
+  isSoundOn: false,
   caretStyle: "line",
   accent: "lime",
-  showCoach: true,
-  onlinePacks: false,
+  isCoachOn: true,
+  usesOnlinePacks: false,
 };
 
 // Build a realistic learning profile: 12 tests fumbling 'q','z','p' keys.
@@ -43,22 +43,22 @@ function simulate(learning: LearningData): void {
       for (let i = 0; i < w.length; i++) {
         t += 140 + Math.random() * 60;
         const miss = "qzp".includes(w[i]) && Math.random() < 0.25;
-        events.push({ t, expected: w[i], typed: miss ? "x" : w[i], correct: !miss });
+        events.push({ t, expected: w[i], typed: miss ? "x" : w[i], isCorrect: !miss });
       }
       t += 90; // space
-      events.push({ t, expected: null, typed: " ", correct: true });
+      events.push({ t, expected: null, typed: " ", isCorrect: true });
     }
     const tally = ingestEvents(learning, events, t);
     finalizeLearning(learning, tally);
   }
 }
 
-const learning = emptyLearning();
+const learning = createEmptyLearning();
 simulate(learning);
 
 // sanity: the profile actually has curation signal
-const uk = keyUrgencies(learning).filter((u) => u.urgency > 0.07).slice(0, 8);
-const ub = bigramUrgencies(learning).filter((u) => u.urgency > 0.07).slice(0, 14);
+const uk = calculateKeyUrgencies(learning).filter((u) => u.urgency > 0.07).slice(0, 8);
+const ub = calculateBigramUrgencies(learning).filter((u) => u.urgency > 0.07).slice(0, 14);
 console.log(`signal: ${uk.length} urgent keys (${uk.slice(0, 4).map((u) => u.key).join(",")}), ${ub.length} urgent bigrams`);
 if (uk.length === 0 && ub.length === 0) {
   console.log("FAIL: simulated profile produced no curation signal — probe invalid");
@@ -109,7 +109,7 @@ if (worstRun > cluster) {
 }
 
 // 4. cold start (no signal) still yields exact counts
-const cold = generateTest({ ...settings }, emptyLearning());
+const cold = generateTest({ ...settings }, createEmptyLearning());
 if (cold.words.length !== settings.wordCount) {
   console.log(`FAIL: cold-start count ${cold.words.length} != ${settings.wordCount}`);
   failed = true;

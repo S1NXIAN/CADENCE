@@ -4,7 +4,7 @@
  * Run: bun scripts/dict-audit.ts
  */
 import { COMMON_WORDS, HARD_WORDS } from "../src/lib/typing/words";
-import { computeWeakKeys, weakBigrams, emptyLearning } from "../src/lib/typing/profiles";
+import { computeWeakKeys, collectWeakBigrams, createEmptyLearning } from "../src/lib/typing/profiles";
 import { newMemCard, reviewMem } from "../src/lib/typing/memory";
 import { keyPrior } from "../src/lib/typing/motor";
 import type { LearningData } from "../src/lib/typing/types";
@@ -38,7 +38,7 @@ function weakProfile(errRate: number, latency: number) {
 
 // synthetic learning data resembling a real intermediate typist
 function learningWithSignal(): LearningData {
-  const l = emptyLearning();
+  const l = createEmptyLearning();
   l.totalTests = 12;
   const weak: Array<[string, number, number]> = [
     ["q", 0.28, 380], ["p", 0.22, 340], ["y", 0.19, 330], ["b", 0.15, 310],
@@ -57,7 +57,7 @@ function learningWithSignal(): LearningData {
 // single 25-word drill actually buy, and how many distinct weak items get hit?
 function setCoverCapacity(learning: LearningData) {
   const weakKeys = computeWeakKeys(learning).filter((w) => w.weakness > 0.07).slice(0, 8);
-  const weakBgs = weakBigrams(learning, 14).filter((w) => w.weakness > 0.07);
+  const weakBgs = collectWeakBigrams(learning, 14).filter((w) => w.weakness > 0.07);
   const targetKeys = new Map(weakKeys.map((w) => [w.key, w.weakness]));
   const targetBgs = new Map(weakBgs.map((w) => [w.bigram, w.weakness]));
 
