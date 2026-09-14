@@ -74,6 +74,7 @@ export function Results({ result, insights, audit }: ResultsProps) {
             <Detail
               label="error tax"
               value={`${tax} wpm`}
+              hint="raw wpm minus net wpm — speed lost to errors"
               tone={tax >= 6 ? "warn" : undefined}
             />
             <Detail label="time" value={`${result.duration}s`} />
@@ -249,7 +250,7 @@ function SpeedPanel({ speed, duration }: { speed: AuditSpeed; duration: number }
         )}
         {speed.warmup >= 0.35 && (
           <div className="text-[var(--warn)]">
-            cold open — first seconds ran {Math.round(speed.warmup * 100)}% under cruise
+            cold open — the first seconds ran {Math.round(speed.warmup * 100)}% under sustained pace
           </div>
         )}
         {speed.fade < 0.15 && speed.warmup < 0.35 && (
@@ -531,7 +532,7 @@ function WordsPanel({ words }: { words: AuditWords }) {
                 {w.word}
               </span>
               <span className="text-[var(--warn)] ml-1.5 tabular-nums">×{w.errors}</span>
-              {w.missed > 0 && <span className="text-faint ml-1 text-[11px]">{w.missed} dropped</span>}
+              {w.missed > 0 && <span className="text-faint ml-1 text-[11px]">{w.missed} missed</span>}
             </span>
           ))}
         </div>
@@ -549,14 +550,17 @@ function Detail({
   value,
   tone,
   muted,
+  hint,
 }: {
   label: string;
   value: string;
   tone?: "warn";
   muted?: boolean;
+  /** native tooltip decoding a brand metric — keeps the label terse on screen */
+  hint?: string;
 }) {
   return (
-    <div>
+    <div title={hint}>
       <div className="text-dim text-xs tracking-wider uppercase">{label}</div>
       <div
         className={

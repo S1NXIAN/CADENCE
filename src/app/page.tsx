@@ -17,6 +17,7 @@ import {
   setPacksEnabled, handleOnline, handleOffline, packRefreshDue, refreshPacks,
 } from "@/lib/typing/online-pack";
 import { ConnectionBadge } from "@/components/typing/connection-badge";
+import { useToast } from "@/hooks/use-toast";
 import {
   exportData, emptyStats, importData, isOnboarded, loadLearning, loadSettings,
   loadStats, persistAll, recordResult, saveLearning, saveSettings, setOnboarded, storedLearningVersion, wipeAll,
@@ -45,6 +46,7 @@ export default function Page() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [focusSignal, setFocusSignal] = useState(0);
   const [onboarded, setOnboardedState] = useState(true);
+  const { toast } = useToast();
 
   const settingsRef = useRef(settings);
   const learningRef = useRef(learning);
@@ -321,7 +323,11 @@ export default function Page() {
   const handleImport = useCallback((json: string) => {
     const parsed = importData(json);
     if (!parsed) {
-      alert("Could not read that backup file. Is it a cadence export?");
+      toast({
+        title: "import failed",
+        description: "That file isn't a cadence backup — export a fresh one from cadence, then import it here.",
+        variant: "destructive",
+      });
       return;
     }
     setSettings(parsed.settings);
@@ -330,6 +336,10 @@ export default function Page() {
     persistAll(parsed.settings, parsed.learning, parsed.stats);
     setStatsOpen(false);
     restartAll();
+    toast({
+      title: "backup imported",
+      description: "settings, learning profile, and stats restored",
+    });
   }, [restartAll]);
 
   const handleReset = useCallback(() => {
@@ -387,15 +397,20 @@ export default function Page() {
         <div className="flex items-center gap-2">
           <ConnectionBadge />
           {stats.streakDays > 0 && (
-            <span className="text-sub bg-elevated hidden items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-mono text-xs sm:inline-flex" style={{ borderColor: "var(--border)" }}>
-              🔥 {stats.streakDays}d
+            <span
+              className="text-sub bg-elevated hidden items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-mono text-xs sm:inline-flex"
+              style={{ borderColor: "var(--border)" }}
+              aria-label={`${stats.streakDays}-day streak`}
+              title={`${stats.streakDays}-day streak`}
+            >
+              <span aria-hidden>🔥</span> {stats.streakDays}d
             </span>
           )}
           <button
             onClick={() => setStatsOpen(true)}
             className="text-dim hover:text-foreground hover:bg-elevated rounded-md p-2 transition-colors"
             aria-label="open stats"
-            title="stats (keys heatmap, history)"
+            title="stats"
           >
             <BarChart3 className="h-5 w-5" />
           </button>
@@ -472,7 +487,9 @@ export default function Page() {
           <Hash className="h-3 w-3" /> numbers
         </button>
         {settings.mode === "adaptive" && (
-          <span className="text-faint">focus {settings.adaptiveIntensity}%</span>
+          <span className="text-faint" title="share of the test aimed at your weakest keys">
+            focus {settings.adaptiveIntensity}%
+          </span>
         )}
       </div>
 
@@ -521,7 +538,7 @@ export default function Page() {
       <footer className="text-dim mt-auto flex flex-wrap items-center justify-between gap-2 px-5 pb-5 font-mono text-xs sm:px-8">
         <div className="flex items-center gap-4">
           <span>
-            <kbd className="bg-elevated rounded border px-1.5 py-0.5" style={{ borderColor: "var(--border)" }}>tab</kbd> restart
+            <kbd className="bg-elevated rounded border px-1.5 py-0.5" style={{ borderColor: "var(--border)" }}>tab</kbd> restart test
           </span>
           <span>
             <kbd className="bg-elevated rounded border px-1.5 py-0.5" style={{ borderColor: "var(--border)" }}>esc</kbd> menu

@@ -35,7 +35,7 @@ function describe(s: PackState): { icon: typeof Wifi; label: string; cls: string
       if (s.cachedOnly) {
         return {
           icon: WifiOff,
-          label: `full potential · ${s.extraWords.toLocaleString()}w cached`,
+          label: `full potential · ${s.extraWords.toLocaleString()} words cached`,
           cls: `text-hue border-hue/30 ${base}`,
           title: "Offline, but your cached word packs are active. Everything stays local.",
         };
@@ -59,7 +59,7 @@ function describe(s: PackState): { icon: typeof Wifi; label: string; cls: string
         icon: Wifi,
         label: "pack sync failed",
         cls: `text-warn border-border ${base}`,
-        title: "Couldn't reach the content CDN. The local core is unaffected — try again later.",
+        title: "Couldn't download the extra word packs. The local core is unaffected — try again later.",
       };
     case "off":
       return {

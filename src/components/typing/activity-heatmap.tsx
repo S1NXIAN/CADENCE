@@ -150,8 +150,8 @@ export function ActivityHeatmap({ stats }: { stats: StatsData }) {
               <span className="text-foreground">{summary.activeDays}</span> active day
               {summary.activeDays === 1 ? "" : "s"} ·{" "}
               <span className="text-foreground">{formatDuration(summary.totalTimeS)}</span> typed ·{" "}
-              <span className="text-foreground">{summary.totalTests}</span> tests · longest run{" "}
-              <span className="text-foreground">{summary.longestRun}d</span> · current{" "}
+              <span className="text-foreground">{summary.totalTests}</span> tests · longest streak{" "}
+              <span className="text-foreground">{summary.longestRun}d</span> · current streak{" "}
               <span className="text-foreground">{summary.currentRun}d</span>
             </>
           ) : (

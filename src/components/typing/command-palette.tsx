@@ -51,7 +51,7 @@ export function CommandPalette({ open, onOpenChange, settings, run }: CommandPal
   };
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange} title="command menu" description="navigate cadence">
+    <CommandDialog open={open} onOpenChange={onOpenChange} title="command menu" description="modes, training options, and app actions">
       <CommandInput placeholder="type a command or search…" />
       <CommandList className="slim-scroll">
         <CommandEmpty>no matching command</CommandEmpty>
@@ -118,7 +118,7 @@ export function CommandPalette({ open, onOpenChange, settings, run }: CommandPal
         <CommandGroup heading="app">
           <CommandItem onSelect={() => act({ type: "restart" })}>
             <Keyboard />
-            <span>new test</span>
+            <span>restart test</span>
             <kbd className="text-dim ml-auto font-mono text-xs">tab</kbd>
           </CommandItem>
           <CommandItem onSelect={() => act({ type: "stats" })}>

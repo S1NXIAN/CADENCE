@@ -58,10 +58,16 @@ export function StatsPanel({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:p-8">
-      <div className="bg-surface slim-scroll my-auto w-full max-w-4xl rounded-2xl border p-6 shadow-2xl sm:p-8" style={{ borderColor: "var(--border)" }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stats-panel-title"
+        className="bg-surface slim-scroll my-auto w-full max-w-4xl rounded-2xl border p-6 shadow-2xl sm:p-8"
+        style={{ borderColor: "var(--border)" }}
+      >
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h2 className="font-mono text-xl font-semibold">your progress</h2>
+            <h2 id="stats-panel-title" className="font-mono text-xl font-semibold">your progress</h2>
             <p className="text-dim mt-1 font-mono text-xs">
               {learning.totalKeystrokes.toLocaleString()} keystrokes studied · everything stored locally
             </p>
@@ -144,13 +150,13 @@ export function StatsPanel({
             )}
             {confusions.length > 0 && (
               <div>
-                <SectionTitle>finger confusions (you pressed → meant)</SectionTitle>
+                <SectionTitle>finger confusions (meant → typed)</SectionTitle>
                 <div className="flex flex-wrap gap-2">
                   {confusions.map((c) => (
                     <span key={`${c.expected}-${c.typed}`} className="bg-elevated inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-mono text-sm" style={{ borderColor: "var(--border)" }}>
-                      <span className="text-err">{c.typed}</span>
+                      <span className="text-sub">{c.expected}</span>
                       <span className="text-dim">→</span>
-                      <span className="text-hue">{c.expected}</span>
+                      <span className="text-err">{c.typed}</span>
                       <span className="text-dim text-xs">×{c.count}</span>
                     </span>
                   ))}
@@ -208,7 +214,9 @@ export function StatsPanel({
 
           <TabsContent value="history">
             {stats.history.length === 0 ? (
-              <div className="text-dim py-8 text-center font-mono text-sm">no tests yet</div>
+              <div className="text-dim py-8 text-center font-mono text-sm">
+                no tests yet — finish one and it lands here
+              </div>
             ) : (
               <div className="slim-scroll max-h-[380px] overflow-y-auto rounded-lg border" style={{ borderColor: "var(--border)" }}>
                 <table className="w-full font-mono text-sm">
@@ -217,7 +225,7 @@ export function StatsPanel({
                       <th className="px-4 py-2.5">wpm</th>
                       <th className="px-4 py-2.5">raw</th>
                       <th className="px-4 py-2.5">acc</th>
-                      <th className="px-4 py-2.5">cons</th>
+                      <th className="px-4 py-2.5">consistency</th>
                       <th className="px-4 py-2.5">mode</th>
                       <th className="px-4 py-2.5">when</th>
                     </tr>
@@ -226,7 +234,13 @@ export function StatsPanel({
                     {stats.history.slice(0, 100).map((h) => (
                       <tr key={h.id} className="border-t" style={{ borderColor: "var(--secondary)" }}>
                         <td className={`px-4 py-2 tabular-nums ${h.isPersonalBest ? "text-hue font-semibold" : ""}`}>
-                          {h.wpm}{h.isPersonalBest ? " ★" : ""}
+                          {h.wpm}
+                          {h.isPersonalBest && (
+                            <>
+                              <span aria-hidden> ★</span>
+                              <span className="sr-only"> personal best</span>
+                            </>
+                          )}
                         </td>
                         <td className="text-sub px-4 py-2 tabular-nums">{h.rawWpm}</td>
                         <td className={`px-4 py-2 tabular-nums ${h.accuracy < 94 ? "text-err" : ""}`}>{h.accuracy}%</td>
@@ -352,7 +366,7 @@ function ResetButton({ onReset }: { onReset: () => void }) {
           onReset();
         } else {
           armed.current = true;
-          if (labelRef.current) labelRef.current.textContent = "click again to confirm";
+          if (labelRef.current) labelRef.current.textContent = "click again to erase everything";
           window.setTimeout(() => {
             armed.current = false;
             if (labelRef.current) labelRef.current.textContent = "reset all data";

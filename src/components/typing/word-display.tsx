@@ -245,7 +245,7 @@ export function WordDisplay({
           )}
         </div>
         <div className="text-dim pb-1 text-xs tracking-wide uppercase xl:text-sm">
-          {settings.mode === "adaptive" ? "curated test" : settings.mode}
+          {settings.mode === "adaptive" ? "adaptive" : settings.mode}
         </div>
       </div>
 
@@ -330,7 +330,7 @@ export function WordDisplay({
       {/* focus hint */}
       {!focused && (
         <div className="text-dim absolute inset-x-0 top-1/2 text-center font-mono text-sm">
-          click here or press any key to focus
+          click anywhere or press any key to continue
         </div>
       )}
     </div>

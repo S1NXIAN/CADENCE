@@ -86,12 +86,12 @@ export function KeyHeatmap({ learning }: { learning: LearningData }) {
       </div>
 
       <div className="text-dim mt-4 flex items-center justify-center gap-2 font-mono text-xs">
-        <span>fast / accurate</span>
+        <span>{mode === "speed" ? "faster" : "cleaner"}</span>
         <span
           className="h-2.5 w-40 rounded-full"
           style={{ background: `linear-gradient(90deg, #3f4a2c, #c2410c)` }}
         />
-        <span>slow / error-prone</span>
+        <span>{mode === "speed" ? "slower" : "error-prone"}</span>
       </div>
       {!hasData && (
         <div className="text-dim mt-2 text-center font-mono text-xs">

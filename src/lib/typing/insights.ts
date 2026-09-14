@@ -126,7 +126,7 @@ function errorTaxNote(c: DetectorCtx): Candidate | null {
       title: v(["the error tax", "mistakes are expensive"]),
       message: v([
         `Raw pace was ${result.rawWpm} wpm; ${tax} of it leaked away to errors. The fix isn't faster fingers today — it's cleaner ones.`,
-        `You typed at ${result.rawWpm} raw and kept only ${result.wpm}. At ${result.accuracy}% accuracy, easing off ~10% nets you MORE speed, not less.`,
+        `You typed at ${result.rawWpm} raw and kept only ${result.wpm}. At ${result.accuracy}% accuracy, easing off ~10% nets you more speed, not less.`,
       ]),
       metric: `${result.rawWpm} → ${result.wpm}`,
     },
@@ -530,7 +530,7 @@ function dueNote(c: DetectorCtx): Candidate | null {
     note: {
       kind: "tip",
       title: "refresher queue building",
-      message: `${due} keys and transitions are due (or due within two days) for a refresher. Adaptive mode schedules them back in before they fade — switching to it for a couple of runs clears the queue.`,
+      message: `${due} keys and transitions come due within two days. Adaptive mode resurfaces them before they fade — a couple of runs there clears the queue.`,
       metric: `${due} due`,
     },
   };

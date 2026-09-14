@@ -46,7 +46,7 @@ export function SettingsModal({ open, onOpenChange, settings, update }: Settings
               onValueChange={(v) => update({ adaptiveIntensity: v[0] })}
             />
             <p className="text-dim text-xs leading-relaxed">
-              How hard the generator leans into your weak keys. Low = gentle mix, high = relentless
+              how hard the generator leans into your weak keys. Low = gentle mix, high = relentless
               drilling on problem letters and pairs.
             </p>
           </div>
@@ -60,7 +60,7 @@ export function SettingsModal({ open, onOpenChange, settings, update }: Settings
             />
             <ToggleRow
               label="punctuation"
-              hint="sprinkle capitals and punctuation into tests"
+              hint="mix capitals and punctuation into tests"
               checked={settings.punctuation}
               onChange={(v) => update({ punctuation: v })}
             />
@@ -72,7 +72,7 @@ export function SettingsModal({ open, onOpenChange, settings, update }: Settings
             />
             <ToggleRow
               label="online word packs"
-              hint="when online: pull a 10k frequency word list + extra quotes, cache them locally for offline use — the core stays fully offline"
+              hint="when online, fetches a 10k frequency word list and extra quotes, cached for offline use — the core stays 100% local"
               checked={settings.onlinePacks}
               onChange={(v) => update({ onlinePacks: v })}
             />

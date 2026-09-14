@@ -102,7 +102,9 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
             stroke="var(--hue-dim)"
             strokeWidth="1"
             strokeDasharray="4 4"
-          />
+          >
+            <title>previous personal best</title>
+          </line>
           <text
             x={width - padR + 24}
             y={pbY + 4}
