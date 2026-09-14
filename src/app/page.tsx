@@ -379,7 +379,7 @@ export default function Page() {
           </div>
           <div>
             <div className="font-mono text-lg font-bold leading-tight tracking-tight">cadence</div>
-            <div className="text-dim -mt-0.5 font-mono text-[10px] tracking-widest uppercase">
+            <div className="text-dim -mt-0.5 font-mono text-[11px] tracking-widest uppercase">
               typing coach · learns you
             </div>
           </div>
@@ -387,7 +387,7 @@ export default function Page() {
         <div className="flex items-center gap-2">
           <ConnectionBadge />
           {stats.streakDays > 0 && (
-            <span className="text-sub bg-elevated hidden items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-mono text-xs sm:inline-flex" style={{ borderColor: "#23252b" }}>
+            <span className="text-sub bg-elevated hidden items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-mono text-xs sm:inline-flex" style={{ borderColor: "var(--border)" }}>
               🔥 {stats.streakDays}d
             </span>
           )}
@@ -521,15 +521,15 @@ export default function Page() {
       <footer className="text-dim mt-auto flex flex-wrap items-center justify-between gap-2 px-5 pb-5 font-mono text-xs sm:px-8">
         <div className="flex items-center gap-4">
           <span>
-            <kbd className="bg-elevated rounded border px-1.5 py-0.5" style={{ borderColor: "#23252b" }}>tab</kbd> restart
+            <kbd className="bg-elevated rounded border px-1.5 py-0.5" style={{ borderColor: "var(--border)" }}>tab</kbd> restart
           </span>
           <span>
-            <kbd className="bg-elevated rounded border px-1.5 py-0.5" style={{ borderColor: "#23252b" }}>esc</kbd> menu
+            <kbd className="bg-elevated rounded border px-1.5 py-0.5" style={{ borderColor: "var(--border)" }}>esc</kbd> menu
           </span>
           {settings.strictMode && <span className="text-[var(--warn)]">strict mode — no backspace</span>}
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="bg-hue/20 text-hue inline-block h-1.5 w-1.5 rounded-full" />
+          <span className="dot-breathe bg-hue/20 inline-block h-1.5 w-1.5 rounded-full" />
           100% local · no account · no cloud
         </div>
       </footer>

@@ -31,7 +31,7 @@ const KIND_ICON: Record<CoachInsightKind, React.ReactNode> = {
   recovery: <Sprout className="text-hue h-4 w-4" />,
 };
 
-const BORDER = "#23252b";
+const BORDER = "var(--border)";
 
 interface ResultsProps {
   result: TestResult;
@@ -119,7 +119,7 @@ export function Results({ result, insights, audit }: ResultsProps) {
             <span className="text-dim font-mono text-xs tracking-widest uppercase">
               coach notes
             </span>
-            <span className="bg-hue/15 text-hue rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold">
+            <span className="bg-hue/15 text-hue rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold">
               {insights.length}
             </span>
           </div>
@@ -272,14 +272,14 @@ function SpeedRow({
   tone?: "hue" | "warn";
 }) {
   const pct = Math.max(3, Math.min(100, (value / peak) * 100));
-  const color = tone === "warn" ? "var(--warn)" : tone === "hue" ? "var(--hue)" : "#5c6270";
+  const color = tone === "warn" ? "var(--warn)" : tone === "hue" ? "var(--hue)" : "var(--dim)";
   return (
     <div>
       <div className="flex items-baseline justify-between font-mono text-[13px]">
         <span className="text-dim">{label}</span>
         <span className="text-sub tabular-nums">
           {value}
-          <span className="text-faint ml-1 text-[10px]">wpm</span>
+          <span className="text-faint ml-1 text-[11px]">wpm</span>
         </span>
       </div>
       <div className="mt-1 h-1 rounded-full" style={{ background: BORDER }}>
@@ -296,17 +296,17 @@ function ErrorPanel({ errors }: { errors: AuditErrors }) {
     <Panel icon={<Crosshair className="h-3.5 w-3.5 text-[var(--warn)]" />} title="error autopsy">
       {/* character fate bar: dark = ok, red = wrong, amber = extra, violet = missed */}
       <div className="flex h-2 overflow-hidden rounded-full" style={{ background: BORDER }}>
-        <div style={{ flexGrow: seg(errors.incorrect), background: "#f87171" }} />
+        <div style={{ flexGrow: seg(errors.incorrect), background: "var(--error)" }} />
         <div style={{ flexGrow: seg(errors.extra), background: "var(--warn)" }} />
-        <div style={{ flexGrow: seg(errors.missed), background: "#a78bfa" }} />
+        <div style={{ flexGrow: seg(errors.missed), background: "var(--chart-6)" }} />
       </div>
       <div className="text-sub mt-2.5 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px]">
         <span>
-          <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle" style={{ background: "#3d414b" }} />
+          <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle" style={{ background: "var(--faint)" }} />
           ok <span className="tabular-nums">{errors.correct}</span>
         </span>
         <span>
-          <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle" style={{ background: "#f87171" }} />
+          <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle" style={{ background: "var(--error)" }} />
           wrong <span className="tabular-nums">{errors.incorrect}</span>
         </span>
         <span>
@@ -314,7 +314,7 @@ function ErrorPanel({ errors }: { errors: AuditErrors }) {
           extra <span className="tabular-nums">{errors.extra}</span>
         </span>
         <span>
-          <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle" style={{ background: "#a78bfa" }} />
+          <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle" style={{ background: "var(--chart-6)" }} />
           missed <span className="tabular-nums">{errors.missed}</span>
         </span>
       </div>
@@ -339,7 +339,7 @@ function ErrorPanel({ errors }: { errors: AuditErrors }) {
 
       {errors.confusions.length > 0 && (
         <div className="mt-3">
-          <div className="text-faint mb-1.5 font-mono text-[10px] tracking-wider uppercase">
+          <div className="text-faint mb-1.5 font-mono text-[11px] tracking-wider uppercase">
             slips — meant → typed
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -367,7 +367,7 @@ function KeysPanel({ keys }: { keys: AuditKeys }) {
     <Panel icon={<Keyboard className="text-hue h-3.5 w-3.5" />} title="key report">
       {keys.focus.length > 0 && (
         <div className="mb-3.5">
-          <div className="text-faint mb-1.5 font-mono text-[10px] tracking-wider uppercase">
+          <div className="text-faint mb-1.5 font-mono text-[11px] tracking-wider uppercase">
             drill targets this test
           </div>
           <div className="space-y-1.5">
@@ -400,7 +400,7 @@ function KeysPanel({ keys }: { keys: AuditKeys }) {
 
       {keys.slowest.length > 0 && (
         <div>
-          <div className="text-faint mb-1.5 font-mono text-[10px] tracking-wider uppercase">
+          <div className="text-faint mb-1.5 font-mono text-[11px] tracking-wider uppercase">
             slowest keys (vs {keys.baseline}ms baseline)
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -421,7 +421,7 @@ function KeysPanel({ keys }: { keys: AuditKeys }) {
 
       {keys.fastest.length > 0 && (
         <div className="mt-3">
-          <div className="text-faint mb-1.5 font-mono text-[10px] tracking-wider uppercase">
+          <div className="text-faint mb-1.5 font-mono text-[11px] tracking-wider uppercase">
             quickest keys
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -531,7 +531,7 @@ function WordsPanel({ words }: { words: AuditWords }) {
                 {w.word}
               </span>
               <span className="text-[var(--warn)] ml-1.5 tabular-nums">×{w.errors}</span>
-              {w.missed > 0 && <span className="text-faint ml-1 text-[10px]">{w.missed} dropped</span>}
+              {w.missed > 0 && <span className="text-faint ml-1 text-[11px]">{w.missed} dropped</span>}
             </span>
           ))}
         </div>

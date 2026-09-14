@@ -35,7 +35,7 @@ export function HistoryChart({ history, height = 190 }: HistoryChartProps) {
     const dots = data.map((d, i) => ({
       x: x(i),
       y: y(d.wpm),
-      color: d.accuracy >= 97 ? "#a3e635" : d.accuracy >= 94 ? "#fbbf24" : "#f87171",
+      color: d.accuracy >= 97 ? "var(--hue)" : d.accuracy >= 94 ? "var(--warn)" : "var(--error)",
       title: `${d.modeLabel} — ${d.wpm} wpm, ${d.accuracy}%`,
     }));
     const yTicks = [0.5, 1].map((f) => ({ v: Math.round(maxY * f), y: y(maxY * f) }));
@@ -54,8 +54,8 @@ export function HistoryChart({ history, height = 190 }: HistoryChartProps) {
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full" role="img" aria-label="wpm history">
       {yTicks.map((t) => (
         <g key={t.v}>
-          <line x1={44} x2={width - 14} y1={t.y} y2={t.y} stroke="#23252b" />
-          <text x={36} y={t.y + 4} textAnchor="end" fontSize="11" fill="#5c6270" fontFamily="var(--font-geist-mono), monospace">
+          <line x1={44} x2={width - 14} y1={t.y} y2={t.y} stroke="var(--border)" />
+          <text x={36} y={t.y + 4} textAnchor="end" fontSize="11" fill="var(--dim)" fontFamily="var(--font-geist-mono), monospace">
             {t.v}
           </text>
         </g>
@@ -66,12 +66,12 @@ export function HistoryChart({ history, height = 190 }: HistoryChartProps) {
           <title>{d.title}</title>
         </circle>
       ))}
-      <g fontFamily="var(--font-geist-mono), monospace" fontSize="11" fill="#9aa0ae">
-        <circle cx={width - 210} cy={padTop()} r="3.5" fill="#a3e635" />
+      <g fontFamily="var(--font-geist-mono), monospace" fontSize="11" fill="var(--sub)">
+        <circle cx={width - 210} cy={padTop()} r="3.5" fill="var(--hue)" />
         <text x={width - 200} y={padTop() + 4}>&ge;97% acc</text>
-        <circle cx={width - 130} cy={padTop()} r="3.5" fill="#fbbf24" />
+        <circle cx={width - 130} cy={padTop()} r="3.5" fill="var(--warn)" />
         <text x={width - 120} y={padTop() + 4}>&ge;94%</text>
-        <circle cx={width - 62} cy={padTop()} r="3.5" fill="#f87171" />
+        <circle cx={width - 62} cy={padTop()} r="3.5" fill="var(--error)" />
         <text x={width - 52} y={padTop() + 4}>&lt;94%</text>
       </g>
     </svg>

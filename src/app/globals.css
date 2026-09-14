@@ -53,9 +53,13 @@
   --color-surface: var(--surface);
   --color-elevated: var(--elevated);
   --color-missed: var(--missed);
+  --color-chart-6: var(--chart-6);
 }
 
-/* Cadence dark palette — warm charcoal, phosphor-green accent */
+/* Cadence dark palette — warm charcoal, phosphor-green accent
+   micro-type floor: 11px — smallest allowed UI text (HTML + chart axis/legend
+   labels). Documented exception: dense heat-map axis labels (10px) whose grid
+   pitch cannot fit 11px. */
 :root,
 .dark {
   --radius: 0.5rem;
@@ -106,6 +110,13 @@
      (≈ oklab mix of 35% --error + 65% --dim, kept as a literal so Tailwind
      reliably type-checks it as a color and generates the utilities.) */
   --missed: #93676f;
+  /* missed-words violet — results error-breakdown only (word stream uses --missed) */
+  --chart-6: #a78bfa;
+  /* danger hairline — destructive chip borders */
+  --err-edge: #3a2525;
+  /* scrollbar thumbs */
+  --scroll-thumb: #2a2d34;
+  --scroll-thumb-hover: #3a3e47;
 }
 
 @layer base {
@@ -177,6 +188,18 @@
   50% { opacity: 0; }
 }
 
+/* footer "100% local" dot — slow phosphor breathing, felt not seen */
+.dot-breathe {
+  animation: dot-breathe 2.8s ease-in-out infinite;
+}
+@keyframes dot-breathe {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dot-breathe { animation: none; }
+}
+
 /* thin custom scrollbars for panels */
 .slim-scroll::-webkit-scrollbar {
   width: 6px;
@@ -186,9 +209,9 @@
   background: transparent;
 }
 .slim-scroll::-webkit-scrollbar-thumb {
-  background: #2a2d34;
+  background: var(--scroll-thumb);
   border-radius: 3px;
 }
 .slim-scroll::-webkit-scrollbar-thumb:hover {
-  background: #3a3e47;
+  background: var(--scroll-thumb-hover);
 }

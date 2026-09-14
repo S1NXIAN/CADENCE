@@ -108,7 +108,7 @@ export function ActivityHeatmap({ stats }: { stats: StatsData }) {
       <div className="slim-scroll overflow-x-auto pb-1">
         <svg width={WIDTH} height={HEIGHT} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="typing activity over the last year" className="block">
           {view.monthLabels.map((m) => (
-            <text key={`${m.x}-${m.text}`} x={m.x} y={11} fontSize="10" fill="#9aa0ae" fontFamily="var(--font-geist-mono), monospace">
+            <text key={`${m.x}-${m.text}`} x={m.x} y={11} fontSize="10" fill="var(--sub)" fontFamily="var(--font-geist-mono), monospace">
               {m.text}
             </text>
           ))}
@@ -119,7 +119,7 @@ export function ActivityHeatmap({ stats }: { stats: StatsData }) {
               y={PAD_T + Number(row) * PITCH + CELL - 1}
               textAnchor="end"
               fontSize="10"
-              fill="#5c6270"
+              fill="var(--dim)"
               fontFamily="var(--font-geist-mono), monospace"
             >
               {label}

@@ -74,20 +74,20 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
       {/* grid */}
       {yTicks.map((t) => (
         <g key={t.v}>
-          <line x1={padL} x2={width - padR} y1={t.y} y2={t.y} stroke="#23252b" strokeWidth="1" />
-          <text x={padL - 8} y={t.y + 4} textAnchor="end" fontSize="11" fill="#5c6270" fontFamily="var(--font-geist-mono), monospace">
+          <line x1={padL} x2={width - padR} y1={t.y} y2={t.y} stroke="var(--border)" strokeWidth="1" />
+          <text x={padL - 8} y={t.y + 4} textAnchor="end" fontSize="11" fill="var(--dim)" fontFamily="var(--font-geist-mono), monospace">
             {t.v}
           </text>
         </g>
       ))}
       {xTicks.map((t) => (
-        <text key={t.v} x={t.x} y={height - 8} textAnchor="middle" fontSize="11" fill="#5c6270" fontFamily="var(--font-geist-mono), monospace">
+        <text key={t.v} x={t.x} y={height - 8} textAnchor="middle" fontSize="11" fill="var(--dim)" fontFamily="var(--font-geist-mono), monospace">
           {t.v}s
         </text>
       ))}
 
       {/* raw line */}
-      <path d={rawPath} fill="none" stroke="#5c6270" strokeWidth="1.5" strokeDasharray="1 0" opacity="0.65" />
+      <path d={rawPath} fill="none" stroke="var(--dim)" strokeWidth="1.5" strokeDasharray="1 0" opacity="0.65" />
       {/* wpm line */}
       <path d={wpmPath} fill="none" stroke="var(--hue)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
 
@@ -106,8 +106,8 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
           <text
             x={width - padR + 24}
             y={pbY + 4}
-            fontSize="10"
-            fill="#9aa0ae"
+            fontSize="11"
+            fill="var(--sub)"
             fontFamily="var(--font-geist-mono), monospace"
           >
             pb
@@ -117,7 +117,7 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
 
       {/* error markers */}
       {errPoints.map((p, i) => (
-        <g key={i} stroke="#f87171" strokeWidth="2" strokeLinecap="round">
+        <g key={i} stroke="var(--error)" strokeWidth="2" strokeLinecap="round">
           <line x1={p.cx - 4} y1={p.cy - 4} x2={p.cx + 4} y2={p.cy + 4} />
           <line x1={p.cx - 4} y1={p.cy + 4} x2={p.cx + 4} y2={p.cy - 4} />
         </g>
@@ -126,14 +126,14 @@ export function ResultChart({ samples, width = 640, height = 200, pbWpm }: Resul
       {/* legend */}
       <g fontFamily="var(--font-geist-mono), monospace" fontSize="11">
         <line x1={padL + 4} y1={padT - 3} x2={padL + 20} y2={padT - 3} stroke="var(--hue)" strokeWidth="2.5" />
-        <text x={padL + 26} y={padT} fill="#9aa0ae">wpm</text>
-        <line x1={padL + 66} y1={padT - 3} x2={padL + 82} y2={padT - 3} stroke="#5c6270" strokeWidth="1.5" />
-        <text x={padL + 88} y={padT} fill="#9aa0ae">raw</text>
-        <g stroke="#f87171" strokeWidth="2" strokeLinecap="round">
+        <text x={padL + 26} y={padT} fill="var(--sub)">wpm</text>
+        <line x1={padL + 66} y1={padT - 3} x2={padL + 82} y2={padT - 3} stroke="var(--dim)" strokeWidth="1.5" />
+        <text x={padL + 88} y={padT} fill="var(--sub)">raw</text>
+        <g stroke="var(--error)" strokeWidth="2" strokeLinecap="round">
           <line x1={padL + 120} y1={padT - 6} x2={padL + 126} y2={padT} />
           <line x1={padL + 120} y1={padT} x2={padL + 126} y2={padT - 6} />
         </g>
-        <text x={padL + 132} y={padT} fill="#9aa0ae">errors</text>
+        <text x={padL + 132} y={padT} fill="var(--sub)">errors</text>
       </g>
     </svg>
   );

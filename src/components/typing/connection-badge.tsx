@@ -58,19 +58,19 @@ function describe(s: PackState): { icon: typeof Wifi; label: string; cls: string
       return {
         icon: Wifi,
         label: "pack sync failed",
-        cls: `text-warn border-[#23252b] ${base}`,
+        cls: `text-warn border-border ${base}`,
         title: "Couldn't reach the content CDN. The local core is unaffected — try again later.",
       };
     case "off":
       return {
         icon: WifiOff,
         label: "local core",
-        cls: `text-dim border-[#23252b] ${base}`,
+        cls: `text-dim border-border ${base}`,
         title: "Online packs disabled — running on the built-in dictionary.",
       };
     default:
       return s.online
-        ? { icon: Wifi, label: "local core", cls: `text-dim border-[#23252b] ${base}`, title: "Online — the engine runs 100% locally." }
-        : { icon: WifiOff, label: "local core", cls: `text-dim border-[#23252b] ${base}`, title: "Offline — the engine runs 100% locally." };
+        ? { icon: Wifi, label: "local core", cls: `text-dim border-border ${base}`, title: "Online — the engine runs 100% locally." }
+        : { icon: WifiOff, label: "local core", cls: `text-dim border-border ${base}`, title: "Offline — the engine runs 100% locally." };
   }
 }

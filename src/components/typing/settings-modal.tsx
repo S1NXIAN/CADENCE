@@ -23,7 +23,7 @@ interface SettingsModalProps {
 export function SettingsModal({ open, onOpenChange, settings, update }: SettingsModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-surface slim-scroll max-h-[85vh] max-w-lg overflow-y-auto font-mono" style={{ borderColor: "#23252b" }}>
+      <DialogContent className="bg-surface slim-scroll max-h-[85vh] max-w-lg overflow-y-auto font-mono" style={{ borderColor: "var(--border)" }}>
         <DialogHeader>
           <DialogTitle className="font-mono">settings</DialogTitle>
           <DialogDescription className="text-dim font-mono text-xs">
@@ -107,7 +107,7 @@ export function SettingsModal({ open, onOpenChange, settings, update }: Settings
                   className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
                     settings.caretStyle === c
                       ? "border-hue/50 bg-hue/10 text-hue"
-                      : "border-[#23252b] text-dim hover:text-foreground"
+                      : "border-border text-dim hover:text-foreground"
                   }`}
                 >
                   {c}

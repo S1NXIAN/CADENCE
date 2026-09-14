@@ -58,7 +58,7 @@ export function StatsPanel({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:p-8">
-      <div className="bg-surface slim-scroll my-auto w-full max-w-4xl rounded-2xl border p-6 shadow-2xl sm:p-8" style={{ borderColor: "#23252b" }}>
+      <div className="bg-surface slim-scroll my-auto w-full max-w-4xl rounded-2xl border p-6 shadow-2xl sm:p-8" style={{ borderColor: "var(--border)" }}>
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h2 className="font-mono text-xl font-semibold">your progress</h2>
@@ -109,7 +109,7 @@ export function StatsPanel({
                     <span
                       key={w.key}
                       className="bg-elevated inline-flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-sm"
-                      style={{ borderColor: "#23252b" }}
+                      style={{ borderColor: "var(--border)" }}
                     >
                       <Keyboard className="text-hue h-3.5 w-3.5" />
                       {w.key}
@@ -131,7 +131,7 @@ export function StatsPanel({
                 <SectionTitle>trickiest key transitions (errors & slow combos)</SectionTitle>
                 <div className="flex flex-wrap gap-2">
                   {bgs.map((b) => (
-                    <span key={b.bigram} className="bg-elevated inline-flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-sm" style={{ borderColor: "#23252b" }}>
+                    <span key={b.bigram} className="bg-elevated inline-flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-sm" style={{ borderColor: "var(--border)" }}>
                       {b.bigram}
                       <span className="text-dim text-xs">
                         {(b.errRate * 100).toFixed(1)}% err
@@ -147,7 +147,7 @@ export function StatsPanel({
                 <SectionTitle>finger confusions (you pressed → meant)</SectionTitle>
                 <div className="flex flex-wrap gap-2">
                   {confusions.map((c) => (
-                    <span key={`${c.expected}-${c.typed}`} className="bg-elevated inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-mono text-sm" style={{ borderColor: "#23252b" }}>
+                    <span key={`${c.expected}-${c.typed}`} className="bg-elevated inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-mono text-sm" style={{ borderColor: "var(--border)" }}>
                       <span className="text-err">{c.typed}</span>
                       <span className="text-dim">→</span>
                       <span className="text-hue">{c.expected}</span>
@@ -210,7 +210,7 @@ export function StatsPanel({
             {stats.history.length === 0 ? (
               <div className="text-dim py-8 text-center font-mono text-sm">no tests yet</div>
             ) : (
-              <div className="slim-scroll max-h-[380px] overflow-y-auto rounded-lg border" style={{ borderColor: "#23252b" }}>
+              <div className="slim-scroll max-h-[380px] overflow-y-auto rounded-lg border" style={{ borderColor: "var(--border)" }}>
                 <table className="w-full font-mono text-sm">
                   <thead className="bg-elevated sticky top-0">
                     <tr className="text-dim text-left text-xs tracking-wider uppercase">
@@ -224,7 +224,7 @@ export function StatsPanel({
                   </thead>
                   <tbody>
                     {stats.history.slice(0, 100).map((h) => (
-                      <tr key={h.id} className="border-t" style={{ borderColor: "#1c1e23" }}>
+                      <tr key={h.id} className="border-t" style={{ borderColor: "var(--secondary)" }}>
                         <td className={`px-4 py-2 tabular-nums ${h.isPersonalBest ? "text-hue font-semibold" : ""}`}>
                           {h.wpm}{h.isPersonalBest ? " ★" : ""}
                         </td>
@@ -250,14 +250,14 @@ export function StatsPanel({
               <button
                 onClick={onExport}
                 className="inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 font-mono text-sm transition-colors hover:bg-elevated"
-                style={{ borderColor: "#23252b" }}
+                style={{ borderColor: "var(--border)" }}
               >
                 <Download className="h-4 w-4" /> export backup
               </button>
               <button
                 onClick={() => fileRef.current?.click()}
                 className="inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 font-mono text-sm transition-colors hover:bg-elevated"
-                style={{ borderColor: "#23252b" }}
+                style={{ borderColor: "var(--border)" }}
               >
                 <Upload className="h-4 w-4" /> import backup
               </button>
@@ -286,7 +286,7 @@ export function StatsPanel({
 
 function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="bg-elevated rounded-xl border p-4" style={{ borderColor: "#23252b" }}>
+    <div className="bg-elevated rounded-xl border p-4" style={{ borderColor: "var(--border)" }}>
       <div className="text-dim flex items-center gap-2 font-mono text-[11px] tracking-wider uppercase">
         {icon}
         {label}
@@ -327,7 +327,7 @@ function WordChip({ word, metric }: { word: UrgentWord; metric: "err" | "due" | 
         ? `${Math.round(word.bestWpm ?? 0)} wpm · ${word.attempts} reps`
         : `${dueLabel(word.dueInMs)} · ${word.attempts} reps`;
   return (
-    <span className="bg-elevated inline-flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-sm" style={{ borderColor: "#23252b" }}>
+    <span className="bg-elevated inline-flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-sm" style={{ borderColor: "var(--border)" }}>
       <span className={isErr ? "text-err" : "text-hue"}>{word.word}</span>
       <span className="text-dim text-xs">{metricText}</span>
     </span>
@@ -360,7 +360,7 @@ function ResetButton({ onReset }: { onReset: () => void }) {
         }
       }}
       className="text-err inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 font-mono text-sm transition-colors hover:bg-elevated"
-      style={{ borderColor: "#3a2525" }}
+      style={{ borderColor: "var(--err-edge)" }}
     >
       <Trash2 className="h-4 w-4" />
       <span ref={labelRef}>reset all data</span>
