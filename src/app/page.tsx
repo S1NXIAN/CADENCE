@@ -6,32 +6,27 @@ import { Results } from "@/components/typing/results";
 import { StatsPanel } from "@/components/typing/stats-panel";
 import { SettingsModal } from "@/components/typing/settings-modal";
 import { CommandPalette, type PaletteAction } from "@/components/typing/command-palette";
+import { ConsoleHeader } from "@/components/typing/console-header";
+import { ConsoleFooter } from "@/components/typing/console-footer";
+import { ModeBar, SubOptions } from "@/components/typing/mode-bar";
+import { StageHud } from "@/components/typing/stage-hud";
 import { useTypingSession } from "@/hooks/use-typing-session";
+import { usePackLifecycle } from "@/hooks/use-pack-lifecycle";
+import { useGlobalKeys } from "@/hooks/use-global-keys";
 import { generateTest } from "@/lib/typing/generator";
 import { emptyLearning, finalizeLearning, ingestEvents } from "@/lib/typing/profiles";
 import { finalizeWordReviews, ingestWordOutcomes } from "@/lib/typing/word-scheduler";
 import { generateInsights, nextTestPreview } from "@/lib/typing/insights";
 import { buildTestAudit, type TestAudit } from "@/lib/typing/audit";
-import { onPacksChanged } from "@/lib/typing/pool";
-import {
-  setPacksEnabled, handleOnline, handleOffline, packRefreshDue, refreshPacks,
-} from "@/lib/typing/online-pack";
-import { ConnectionBadge } from "@/components/typing/connection-badge";
+import { downloadBackup } from "@/lib/typing/backup";
 import { useToast } from "@/hooks/use-toast";
 import {
-  exportData, emptyStats, importData, isOnboarded, loadLearning, loadSettings,
+  emptyStats, importData, isOnboarded, loadLearning, loadSettings,
   loadStats, persistAll, recordResult, saveLearning, saveSettings, setOnboarded, storedLearningVersion, wipeAll,
 } from "@/lib/typing/storage";
-import type { CharEvent, CoachInsight, LearningData, Settings, StatsData, TestResult, WordOutcome } from "@/lib/typing/types";
+import type { CharEvent, CoachInsight, LearningData, Settings, StatsData, TestMode, TestResult, WordOutcome } from "@/lib/typing/types";
 import { ACCENT_COLORS, DEFAULT_SETTINGS } from "@/lib/typing/types";
-import { Zap, Timer, AlignLeft, Quote, AtSign, Hash, BarChart3, Settings as SettingsIcon, Waves, Keyboard, Flame } from "lucide-react";
-
-const MODE_ICONS = {
-  adaptive: <Zap className="h-3.5 w-3.5" />,
-  time: <Timer className="h-3.5 w-3.5" />,
-  words: <AlignLeft className="h-3.5 w-3.5" />,
-  quote: <Quote className="h-3.5 w-3.5" />,
-};
+import { Zap, Keyboard } from "lucide-react";
 
 export default function Page() {
   const [ready, setReady] = useState(false);
@@ -45,7 +40,7 @@ export default function Page() {
   const [statsOpen, setStatsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [focusSignal, setFocusSignal] = useState(0);
-  const [onboarded, setOnboardedState] = useState(true);
+  const [hasOnboarded, setHasOnboarded] = useState(true);
   const { toast } = useToast();
 
   const settingsRef = useRef(settings);
@@ -68,56 +63,11 @@ export default function Page() {
       saveLearning(loadedLearning);
     }
     setStats(loadStats());
-    setOnboardedState(isOnboarded());
+    setHasOnboarded(isOnboarded());
     setReady(true);
   }, []);
 
-  // ---- full-potential layer (WiFi/online detection, cached content packs) --
-  // Effect 1 owns ONLY the browser connectivity events; Effect 2 owns pack
-  // lifecycle (hydrate + at most ONE weekly-gated refresh). Splitting them
-  // this way guarantees a single fetch path per trigger — earlier both
-  // effects could (and did) kick off overlapping fetches on boot.
-  useEffect(() => {
-    if (!ready) return;
-    const onOnline = () => handleOnline(settingsRef.current.onlinePacks);
-    const onOffline = () => handleOffline();
-    window.addEventListener("online", onOnline);
-    window.addEventListener("offline", onOffline);
-    return () => {
-      window.removeEventListener("online", onOnline);
-      window.removeEventListener("offline", onOffline);
-    };
-  }, [ready]);
-
-  // apply pack lifecycle whenever readiness or the toggle changes (including boot)
-  useEffect(() => {
-    if (!ready) return;
-    setPacksEnabled(settings.onlinePacks);
-    if (settings.onlinePacks && navigator.onLine && packRefreshDue()) {
-      void refreshPacks(true);
-    }
-  }, [ready, settings.onlinePacks]);
-
-  // when packs finish loading mid-session-idle, refresh the current test so
-  // the expanded vocabulary is immediately live (never mid-test). Debounced:
-  // pack arrival lands as several registerPack calls (words, quotes, live
-  // refresh) and each would otherwise regenerate the idle test separately.
-  useEffect(() => {
-    if (!ready) return;
-    let timer: number | null = null;
-    const unsub = onPacksChanged(() => {
-      if (sessionRef.current.status !== "idle") return;
-      if (timer !== null) window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        timer = null;
-        if (sessionRef.current.status === "idle") sessionRef.current.restart();
-      }, 150);
-    });
-    return () => {
-      unsub();
-      if (timer !== null) window.clearTimeout(timer);
-    };
-  }, [ready]);
+  usePackLifecycle({ ready, enabled: settings.onlinePacks, sessionRef });
 
   // ---- accent theming -----------------------------------------------------
   useEffect(() => {
@@ -168,6 +118,30 @@ export default function Page() {
     if (!ready) return;
     saveSettings(settings);
   }, [settings, ready]);
+
+  // ---- overlay controls (stable identities so memoized children skip) -----
+  const bumpFocus = useCallback(() => setFocusSignal((s) => s + 1), []);
+  const openPalette = useCallback(() => setPaletteOpen(true), []);
+  const openStats = useCallback(() => setStatsOpen(true), []);
+  const openSettings = useCallback(() => setSettingsOpen(true), []);
+  const closePalette = useCallback((o: boolean) => {
+    setPaletteOpen(o);
+    if (!o) bumpFocus();
+  }, [bumpFocus]);
+  const closeSettings = useCallback((o: boolean) => {
+    setSettingsOpen(o);
+    if (!o) bumpFocus();
+  }, [bumpFocus]);
+  const closeStats = useCallback(() => {
+    setStatsOpen(false);
+    bumpFocus();
+  }, [bumpFocus]);
+  const closeOverlays = useCallback(() => {
+    setPaletteOpen(false);
+    setStatsOpen(false);
+    setSettingsOpen(false);
+    bumpFocus();
+  }, [bumpFocus]);
 
   // ---- test completion ----------------------------------------------------
   const handleFinish = useCallback(
@@ -224,8 +198,8 @@ export default function Page() {
     setResultForDisplay(null);
     setInsights([]);
     setAudit(null);
-    setFocusSignal((s) => s + 1);
-  }, [session.restart]);
+    bumpFocus();
+  }, [session.restart, bumpFocus]);
 
   // regenerate when test-shape settings change
   useEffect(() => {
@@ -233,51 +207,17 @@ export default function Page() {
     restartAll();
   }, [ready, settings.mode, settings.timeDuration, settings.wordCount, settings.punctuation, settings.numbers, restartAll]);
 
-  // ---- global keyboard: Tab restart, Esc palette ---------------------------
-  const { typeChar, submitWord, backspace } = session;
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const overlayOpen = paletteOpen || statsOpen || settingsOpen;
-      if (e.key === "Escape") {
-        // capture-phase ownership: prevent Radix dialogs from double-handling
-        e.preventDefault();
-        e.stopPropagation();
-        if (overlayOpen) {
-          setPaletteOpen(false);
-          setStatsOpen(false);
-          setSettingsOpen(false);
-          setFocusSignal((s) => s + 1);
-        } else if (ready) {
-          setPaletteOpen(true);
-        }
-        return;
-      }
-      if (overlayOpen || !ready) return;
-      if (e.key === "Tab") {
-        e.preventDefault();
-        e.stopPropagation();
-        restartAll();
-        return;
-      }
-      // focus redirect: if the hidden typing input lost focus (e.g. a button
-      // was clicked), any typing keypress re-enters the session directly
-      if (session.status === "done") return;
-      const tag = (document.activeElement as HTMLElement | null)?.tagName;
-      const activeIsInput = tag === "INPUT" || tag === "TEXTAREA";
-      if (!activeIsInput && (e.key.length === 1 || e.key === "Backspace")) {
-        const inp = document.querySelector<HTMLInputElement>('input[aria-label="typing input"]');
-        inp?.focus();
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.key === " ") submitWord();
-        else if (e.key === "Backspace") backspace(e.ctrlKey || e.metaKey);
-        else typeChar(e.key);
-      }
-    };
-    // capture phase: this handler runs before any Radix/dialog key handling
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [paletteOpen, statsOpen, settingsOpen, ready, restartAll, session.status, typeChar, submitWord, backspace]);
+  useGlobalKeys({
+    ready,
+    isOverlayOpen: paletteOpen || statsOpen || settingsOpen,
+    closeOverlays,
+    openPalette,
+    restart: restartAll,
+    status: session.status,
+    typeChar: session.typeChar,
+    submitWord: session.submitWord,
+    backspace: session.backspace,
+  });
 
   // ---- palette actions ------------------------------------------------------
   const runAction = useCallback(
@@ -302,27 +242,27 @@ export default function Page() {
           restartAll();
           break;
         case "stats":
-          setStatsOpen(true);
+          openStats();
           break;
         case "settings":
-          setSettingsOpen(true);
+          openSettings();
           break;
         case "export":
-          doExport(settingsRef.current, learningRef.current, stats);
+          downloadBackup(settingsRef.current, learningRef.current, stats);
           break;
         case "import":
-          setStatsOpen(true);
+          openStats();
           window.setTimeout(() => {
             document.querySelector<HTMLInputElement>('input[type="file"][accept="application/json"]')?.click();
           }, 150);
           break;
       }
     },
-    [updateSettings, restartAll, stats]
+    [updateSettings, restartAll, openStats, openSettings, stats]
   );
 
   const handleExport = useCallback(() => {
-    doExport(settings, learning, stats);
+    downloadBackup(settings, learning, stats);
   }, [settings, learning, stats]);
 
   const handleImport = useCallback((json: string) => {
@@ -345,7 +285,7 @@ export default function Page() {
       title: "backup imported",
       description: "settings, learning profile, and stats restored",
     });
-  }, [restartAll]);
+  }, [restartAll, toast]);
 
   const handleReset = useCallback(() => {
     wipeAll();
@@ -358,6 +298,12 @@ export default function Page() {
     setAudit(null);
     restartAll();
   }, [restartAll]);
+
+  const handleSelectMode = useCallback((mode: TestMode) => updateSettings({ mode }), [updateSettings]);
+  const handleSelectTime = useCallback((timeDuration: number) => updateSettings({ mode: "time", timeDuration }), [updateSettings]);
+  const handleSelectWordCount = useCallback((wordCount: number) => updateSettings({ wordCount }), [updateSettings]);
+  const handleTogglePunctuation = useCallback(() => updateSettings({ punctuation: !settingsRef.current.punctuation }), [updateSettings]);
+  const handleToggleNumbers = useCallback(() => updateSettings({ numbers: !settingsRef.current.numbers }), [updateSettings]);
 
   const done = session.status === "done" && resultForDisplay;
   // the preview only changes when the learning model or mode changes — memoized
@@ -386,121 +332,28 @@ export default function Page() {
         />
       </div>
 
-      {/* header */}
-      <header className="flex items-center justify-between px-5 pt-5 sm:px-8">
-        <div className="flex items-center gap-3">
-          <div className="bg-hue/15 border-hue/30 flex h-9 w-9 items-center justify-center rounded-lg border">
-            <Waves className="text-hue h-5 w-5" />
-          </div>
-          <div>
-            <div className="font-mono text-lg font-bold leading-tight tracking-tight">cadence</div>
-            <div className="text-dim -mt-0.5 font-mono text-[11px] tracking-widest uppercase">
-              typing coach · learns you
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <ConnectionBadge />
-          {stats.streakDays > 0 && (
-            <span
-              className="text-sub bg-elevated hidden items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-mono text-xs sm:inline-flex"
-              aria-label={`${stats.streakDays}-day streak`}
-              title={`${stats.streakDays}-day streak`}
-            >
-              <Flame className="text-warn h-3.5 w-3.5" aria-hidden />
-              {stats.streakDays}d
-            </span>
-          )}
-          <button
-            onClick={() => setStatsOpen(true)}
-            className="text-dim hover:text-foreground hover:bg-elevated rounded-md p-2 transition-colors"
-            aria-label="open stats"
-            title="stats"
-          >
-            <BarChart3 className="h-5 w-5" />
-          </button>
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="text-dim hover:text-foreground hover:bg-elevated rounded-md p-2 transition-colors"
-            aria-label="open settings"
-            title="settings"
-          >
-            <SettingsIcon className="h-5 w-5" />
-          </button>
-        </div>
-      </header>
+      <ConsoleHeader
+        streakDays={stats.streakDays}
+        onOpenStats={openStats}
+        onOpenSettings={openSettings}
+      />
 
-      {/* mode bar */}
-      <nav className="mt-5 flex justify-center px-4" aria-label="test modes">
-        <div className="flex flex-wrap items-center justify-center gap-1">
-          {(["adaptive", "time", "words", "quote"] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => updateSettings({ mode: m })}
-              className={`rounded-md px-3.5 py-1.5 font-mono text-sm transition-colors ${
-                settings.mode === m
-                  ? "bg-hue/15 text-hue font-semibold"
-                  : "text-dim hover:bg-elevated hover:text-foreground"
-              }`}
-            >
-              <span className="mr-1.5 inline-flex items-center gap-1.5">
-                {MODE_ICONS[m]}
-                {m}
-              </span>
-            </button>
-          ))}
-        </div>
-      </nav>
+      <ModeBar mode={settings.mode} onSelectMode={handleSelectMode} />
 
-      {/* sub-options */}
-      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 px-4 font-mono text-xs">
-        {settings.mode === "time" &&
-          [15, 30, 60, 120].map((t) => (
-            <button
-              key={t}
-              onClick={() => updateSettings({ timeDuration: t })}
-              className={`transition-colors ${settings.timeDuration === t ? "text-hue" : "text-faint hover:text-foreground"}`}
-            >
-              {t}
-            </button>
-          ))}
-        {(settings.mode === "words" || settings.mode === "adaptive") &&
-          [10, 25, 50, 100].map((c) => (
-            <button
-              key={c}
-              onClick={() => updateSettings({ wordCount: c })}
-              className={`transition-colors ${settings.wordCount === c ? "text-hue" : "text-faint hover:text-foreground"}`}
-            >
-              {c}
-            </button>
-          ))}
-        {settings.mode === "quote" && (
-          <button onClick={restartAll} className="text-faint transition-colors hover:text-foreground">
-            next quote
-          </button>
-        )}
-        <button
-          onClick={() => updateSettings({ punctuation: !settings.punctuation })}
-          className={`inline-flex items-center gap-1 transition-colors ${settings.punctuation ? "text-hue" : "text-faint hover:text-foreground"}`}
-        >
-          <AtSign className="h-3 w-3" /> punctuation
-        </button>
-        <button
-          onClick={() => updateSettings({ numbers: !settings.numbers })}
-          className={`inline-flex items-center gap-1 transition-colors ${settings.numbers ? "text-hue" : "text-faint hover:text-foreground"}`}
-        >
-          <Hash className="h-3 w-3" /> numbers
-        </button>
-        {settings.mode === "adaptive" && (
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="text-faint inline-flex items-center gap-1 transition-colors hover:text-foreground"
-            title="adaptive intensity — click to adjust (or use the command menu)"
-          >
-            focus {settings.adaptiveIntensity}%
-          </button>
-        )}
-      </div>
+      <SubOptions
+        mode={settings.mode}
+        timeDuration={settings.timeDuration}
+        wordCount={settings.wordCount}
+        punctuation={settings.punctuation}
+        numbers={settings.numbers}
+        adaptiveIntensity={settings.adaptiveIntensity}
+        onSelectTime={handleSelectTime}
+        onSelectWordCount={handleSelectWordCount}
+        onTogglePunctuation={handleTogglePunctuation}
+        onToggleNumbers={handleToggleNumbers}
+        onNextQuote={restartAll}
+        onOpenIntensity={openSettings}
+      />
 
       {/* main stage */}
       <main className="flex flex-1 flex-col items-center justify-center px-4 py-6 sm:px-8 xl:py-8">
@@ -513,18 +366,25 @@ export default function Page() {
             />
           ) : (
             <>
-              <WordDisplay
-                words={session.words}
-                typedFor={session.typedFor}
-                wordIndex={session.typedWords.length}
-                input={session.input}
+              <StageHud
+                mode={settings.mode}
                 status={session.status}
-                settings={settings}
                 timeLeft={session.timeLeft}
+                wordIndex={session.typedWords.length}
+                wordCount={session.words.length}
                 liveWpm={session.liveWpm}
                 liveAcc={session.liveAcc}
-                onKeyDown={session.handleKeyDown}
+                showLiveWpm={settings.liveWpm}
+              />
+              <WordDisplay
+                words={session.words}
+                typedWords={session.typedWords}
+                input={session.input}
+                wordIndex={session.typedWords.length}
+                status={session.status}
+                caretStyle={settings.caretStyle}
                 focusSignal={focusSignal}
+                onKeyDown={session.handleKeyDown}
               />
               {settings.showCoach && coachLine && (
                 <div className="text-dim mt-6 flex items-start gap-2.5 px-1 font-mono text-[13px] leading-relaxed xl:mt-7 xl:text-sm">
@@ -532,7 +392,7 @@ export default function Page() {
                   <span>{coachLine}</span>
                 </div>
               )}
-              {!onboarded && (
+              {!hasOnboarded && (
                 <div className="text-sub mt-4 flex items-center gap-2.5 px-1 font-mono text-[13px]">
                   <Keyboard className="h-4 w-4" />
                   <span>just start typing — the coach studies every keystroke and builds your next test</span>
@@ -543,29 +403,14 @@ export default function Page() {
         </div>
       </main>
 
-      {/* footer */}
-      <footer className="text-dim mt-auto flex flex-wrap items-center justify-between gap-2 px-5 pb-5 font-mono text-xs sm:px-8">
-        <div className="flex items-center gap-4">
-          <span>
-            <kbd className="bg-elevated rounded border px-1.5 py-0.5">tab</kbd> restart test
-          </span>
-          <span>
-            <kbd className="bg-elevated rounded border px-1.5 py-0.5">esc</kbd> menu
-          </span>
-          {settings.strictMode && <span className="text-warn">strict mode — no backspace</span>}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="dot-breathe bg-hue/20 inline-block h-1.5 w-1.5 rounded-full" />
-          100% local · no account · no cloud
-        </div>
-      </footer>
+      <ConsoleFooter strictMode={settings.strictMode} />
 
       {/* overlays */}
-      <CommandPalette open={paletteOpen} onOpenChange={(o) => { setPaletteOpen(o); if (!o) setFocusSignal((s) => s + 1); }} settings={settings} run={runAction} />
-      <SettingsModal open={settingsOpen} onOpenChange={(o) => { setSettingsOpen(o); if (!o) setFocusSignal((s) => s + 1); }} settings={settings} update={updateSettings} />
+      <CommandPalette open={paletteOpen} onOpenChange={closePalette} settings={settings} run={runAction} />
+      <SettingsModal open={settingsOpen} onOpenChange={closeSettings} settings={settings} update={updateSettings} />
       <StatsPanel
         open={statsOpen}
-        onClose={() => { setStatsOpen(false); setFocusSignal((s) => s + 1); }}
+        onClose={closeStats}
         stats={stats}
         learning={learning}
         onExport={handleExport}
@@ -581,15 +426,4 @@ function cloneLearning(l: LearningData): LearningData {
   // the JSON fallback keeps very old browsers alive
   if (typeof structuredClone === "function") return structuredClone(l);
   return JSON.parse(JSON.stringify(l)) as LearningData;
-}
-
-function doExport(settings: Settings, learning: LearningData, stats: StatsData) {
-  const json = exportData(settings, learning, stats);
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `cadence-backup-${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
 }

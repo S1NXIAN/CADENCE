@@ -97,6 +97,75 @@ function bumpTally(map: Map<string, Tally>, id: string, err: number, lat: number
   }
 }
 
+// --- confusion / error-context indexes ------------------------------------
+// The persisted shapes are arrays (sorted-by-count, capped); per-event lookups
+// go through a Map index of the same object references so a mistake-heavy test
+// never degrades to O(capped-list) scans per error.
+
+function pairKeyOf(expected: string, typed: string): string {
+  return `${expected}>${typed}`;
+}
+
+function rebuildConfusionIndex(
+  confusions: ConfusionPair[],
+  index: Map<string, ConfusionPair>,
+): void {
+  index.clear();
+  for (const c of confusions) index.set(pairKeyOf(c.expected, c.typed), c);
+}
+
+function recordConfusion(
+  learning: LearningData,
+  index: Map<string, ConfusionPair>,
+  expected: string,
+  typed: string,
+): void {
+  const key = pairKeyOf(expected, typed);
+  const existing = index.get(key);
+  if (existing) {
+    existing.count += 1;
+    existing.lastSeen = Date.now();
+    return;
+  }
+  const pair: ConfusionPair = { expected, typed, count: 1, lastSeen: Date.now() };
+  learning.confusions.push(pair);
+  index.set(key, pair);
+  if (learning.confusions.length > MAX_CONFUSIONS) {
+    learning.confusions.sort((a, b) => b.count - a.count);
+    learning.confusions.length = MAX_CONFUSIONS;
+    rebuildConfusionIndex(learning.confusions, index);
+  }
+}
+
+function rebuildContextIndex(
+  contexts: ErrorContext[],
+  index: Map<string, ErrorContext>,
+): void {
+  index.clear();
+  for (const c of contexts) index.set(c.trigram, c);
+}
+
+function recordErrorContext(
+  learning: LearningData,
+  index: Map<string, ErrorContext>,
+  trigram: string,
+): void {
+  const existing = index.get(trigram);
+  if (existing) {
+    existing.count += 1;
+    existing.lastSeen = Date.now();
+    return;
+  }
+  const context: ErrorContext = { trigram, count: 1, lastSeen: Date.now() };
+  learning.errorContexts.push(context);
+  index.set(trigram, context);
+  if (learning.errorContexts.length > MAX_ERROR_CONTEXTS) {
+    learning.errorContexts.sort((a, b) => b.count - a.count);
+    learning.errorContexts.length = MAX_ERROR_CONTEXTS;
+    rebuildContextIndex(learning.errorContexts, index);
+  }
+}
+
 /**
  * Ingest all character events from a finished test into the learning data.
  * - correct keystrokes update motor latency (EWMA) for the pressed key
@@ -113,9 +182,15 @@ export function ingestEvents(learning: LearningData, events: CharEvent[], durati
   let prevTyped: string | null = null;
   let prevTime: number | null = null;
   const lastPressed: string[] = []; // last 2 tracked pressed chars, for error context
+  const confusionIndex = new Map<string, ConfusionPair>();
+  rebuildConfusionIndex(learning.confusions, confusionIndex);
+  const contextIndex = new Map<string, ErrorContext>();
+  rebuildContextIndex(learning.errorContexts, contextIndex);
+  let correctCount = 0;
 
   for (const ev of events) {
     learning.totalKeystrokes += 1;
+    if (ev.correct) correctCount += 1;
     const delta = ev.correct && prevTime !== null && ev.t - prevTime > 20 && ev.t - prevTime < MAX_LATENCY_SAMPLE
       ? ev.t - prevTime
       : null;
@@ -178,39 +253,14 @@ export function ingestEvents(learning: LearningData, events: CharEvent[], durati
       const exp = ev.expected.toLowerCase();
       const typ = ev.typed.toLowerCase();
       if (isTrackedKey(exp) && typ.length === 1) {
-        const existing = learning.confusions.find((c) => c.expected === exp && c.typed === typ);
-        if (existing) {
-          existing.count += 1;
-          existing.lastSeen = Date.now();
-        } else {
-          learning.confusions.push({
-            expected: exp,
-            typed: typ,
-            count: 1,
-            lastSeen: Date.now(),
-          });
-          if (learning.confusions.length > MAX_CONFUSIONS) {
-            learning.confusions.sort((a, b) => b.count - a.count);
-            learning.confusions.length = MAX_CONFUSIONS;
-          }
-        }
+        recordConfusion(learning, confusionIndex, exp, typ);
       }
     }
 
     // trigram error context: the 2 keys pressed immediately BEFORE the mistake
     if (ev.expected && !ev.correct && isTrackedKey(ev.expected) && lastPressed.length === 2) {
       const tri = (lastPressed[0] + lastPressed[1] + ev.expected).toLowerCase();
-      const existing = learning.errorContexts.find((c) => c.trigram === tri);
-      if (existing) {
-        existing.count += 1;
-        existing.lastSeen = Date.now();
-      } else {
-        learning.errorContexts.push({ trigram: tri, count: 1, lastSeen: Date.now() });
-        if (learning.errorContexts.length > MAX_ERROR_CONTEXTS) {
-          learning.errorContexts.sort((a, b) => b.count - a.count);
-          learning.errorContexts.length = MAX_ERROR_CONTEXTS;
-        }
-      }
+      recordErrorContext(learning, contextIndex, tri);
     }
 
     // pressed-char history for error contexts
@@ -223,7 +273,7 @@ export function ingestEvents(learning: LearningData, events: CharEvent[], durati
     prevTime = ev.t;
   }
 
-  learning.totalChars += events.filter((e) => e.correct).length;
+  learning.totalChars += correctCount;
   learning.totalTimeMs += durationMs;
   return tally;
 }

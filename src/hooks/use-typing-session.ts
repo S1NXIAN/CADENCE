@@ -3,26 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CharEvent, SecondSample, Settings, TestResult, WordOutcome } from "@/lib/typing/types";
 import type { GeneratedTest } from "@/lib/typing/generator";
+import { diffWord } from "@/lib/typing/diff";
 
 export type SessionStatus = "idle" | "running" | "done";
-interface WordDiff {
-  correct: number;
-  incorrect: number;
-  extra: number;
-  missed: number;
-}
 
-function diffWord(target: string, typed: string): WordDiff {
-  let correct = 0;
-  let incorrect = 0;
-  const minLen = Math.min(target.length, typed.length);
-  for (let i = 0; i < minLen; i++) {
-    if (target[i] === typed[i]) correct++;
-    else incorrect++;
-  }
-  const extra = Math.max(0, typed.length - target.length);
-  const missed = Math.max(0, target.length - typed.length);
-  return { correct, incorrect, extra, missed };
+/** running tally of the event log, maintained at push time so live metrics
+ *  stay O(1) per timer tick instead of re-scanning the whole log */
+interface KeystrokeCounters {
+  total: number;
+  correct: number;
 }
 
 interface UseTypingSessionOpts {
@@ -68,16 +57,15 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
   const statusRef = useRef<SessionStatus>("idle");
   const startedAtRef = useRef<number | null>(null);
   const eventsRef = useRef<CharEvent[]>([]);
+  const countersRef = useRef<KeystrokeCounters>({ total: 0, correct: 0 });
   const samplesRef = useRef<SecondSample[]>([]);
   const lastSampleSecondRef = useRef(0);
   const errorsThisSecondRef = useRef(0);
-  const lastKeystrokeAtRef = useRef<number | null>(null);
-  const charStatsRef = useRef({ correct: 0, incorrect: 0, extra: 0, missed: 0 });
+  const wordOutcomesRef = useRef<WordOutcome[]>([]);
   // per-word attempt tracking (word memory scheduler): start time of the
   // CURRENT attempt (null until its first keystroke), wrong keystrokes in the
   // current attempt (incl. later-corrected ones), committed outcomes — kept
   // index-aligned with typedWordsRef so pull-backs pop in lockstep
-  const wordOutcomesRef = useRef<WordOutcome[]>([]);
   const wordStartRef = useRef<number | null>(null);
   const wordErrRef = useRef(0);
 
@@ -91,11 +79,10 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
     statusRef.current = "idle";
     startedAtRef.current = null;
     eventsRef.current = [];
+    countersRef.current = { total: 0, correct: 0 };
     samplesRef.current = [];
     lastSampleSecondRef.current = 0;
     errorsThisSecondRef.current = 0;
-    lastKeystrokeAtRef.current = null;
-    charStatsRef.current = { correct: 0, incorrect: 0, extra: 0, missed: 0 };
     wordOutcomesRef.current = [];
     wordStartRef.current = null;
     wordErrRef.current = 0;
@@ -137,9 +124,7 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
     const elapsedMs = startedAtRef.current ? performance.now() - startedAtRef.current : 0;
     const minutes = Math.max(elapsedMs, 500) / 60000;
 
-    const events = eventsRef.current;
-    const totalKeystrokes = events.length;
-    const correctKeystrokes = events.filter((e) => e.correct).length;
+    const { total: totalKeystrokes, correct: correctKeystrokes } = countersRef.current;
 
     const wpm = correctChars > 0 ? Math.round(correctChars / 5 / minutes) : 0;
     const acc = totalKeystrokes > 0 ? (correctKeystrokes / totalKeystrokes) * 100 : 100;
@@ -189,8 +174,7 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
     }
 
     const events = eventsRef.current;
-    const totalKeystrokes = events.length;
-    const correctKeystrokes = events.filter((e) => e.correct).length;
+    const { total: totalKeystrokes, correct: correctKeystrokes } = countersRef.current;
 
     const wpm = Math.round(correctChars / 5 / minutes);
     const rawWpm = Math.round((correctChars + incorrectChars + extraChars) / 5 / minutes);
@@ -295,6 +279,8 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
       startIfIdle();
       const t = startedAtRef.current ? performance.now() - startedAtRef.current : 0;
       eventsRef.current.push({ t, expected, typed: ch, correct });
+      countersRef.current.total += 1;
+      if (correct) countersRef.current.correct += 1;
       if (wordStartRef.current === null) wordStartRef.current = t; // first keystroke of this attempt
       if (!correct) {
         errorsThisSecondRef.current += 1;
@@ -348,6 +334,7 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
       for (let i = typed.length; i < target.length; i++) {
         eventsRef.current.push({ t: nowT, expected: target[i], typed: "", correct: false });
       }
+      countersRef.current.total += target.length - typed.length;
     }
 
     // the space keystroke itself enters the event log: it resets the bigram
@@ -355,6 +342,8 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
     // first char of this one were NEVER adjacent — a space sits between them)
     // and counts as the keystroke it is for accuracy/sound
     eventsRef.current.push({ t: nowT, expected: " ", typed: " ", correct: true });
+    countersRef.current.total += 1;
+    countersRef.current.correct += 1;
     optsRef.current.onKeystroke?.(true);
 
     typedWordsRef.current = [...typedWordsRef.current, typed];
@@ -440,16 +429,6 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
     [typeChar, submitWord, handleBackspace]
   );
 
-  /** words with typed state for rendering: ["ap-ple", ...] — typed overlay per word */
-  const typedFor = useCallback(
-    (i: number): string => {
-      if (i < typedWords.length) return typedWords[i] ?? "";
-      if (i === typedWords.length) return input;
-      return "";
-    },
-    [typedWords, input]
-  );
-
   const timeLeft = useMemo(() => {
     if (test.timeLimit === null) return null;
     if (status === "idle") return test.timeLimit;
@@ -482,7 +461,6 @@ export function useTypingSession(opts: UseTypingSessionOpts) {
     submitWord,
     computeLiveMetrics,
     finishTest,
-    typedFor,
     focusKeys: test.focusKeys,
   };
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import type { Settings, TestMode } from "@/lib/typing/types";
 import {
   CommandDialog,
@@ -44,7 +45,8 @@ const MODES: { mode: TestMode; label: string; icon: React.ReactNode }[] = [
 const TIMES = [15, 30, 60, 120];
 const COUNTS = [10, 25, 50, 100];
 
-export function CommandPalette({ open, onOpenChange, settings, run }: CommandPaletteProps) {
+/** memoized — while closed it skips rendering entirely on every parent render */
+export const CommandPalette = memo(function CommandPalette({ open, onOpenChange, settings, run }: CommandPaletteProps) {
   const act = (a: PaletteAction) => {
     run(a);
     onOpenChange(false);
@@ -149,4 +151,4 @@ export function CommandPalette({ open, onOpenChange, settings, run }: CommandPal
       </CommandList>
     </CommandDialog>
   );
-}
+});

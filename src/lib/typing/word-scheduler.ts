@@ -35,6 +35,7 @@
  * Same-key repeats ("iii") get a 25% discount: repeat taps are fast.
  */
 import type { LearningData, WordOutcome } from "./types";
+import { isWordImperfect } from "./diff";
 import { newMemCard, reviewMem, memRetrievability, type GradeName } from "./memory";
 import { effLatency, personalMedianLatency } from "./profiles";
 import { classifyBigram, keyPrior, PRIOR_BASE_LAT } from "./motor";
@@ -74,16 +75,6 @@ export function normalizeWordKey(raw: string): string | null {
   w = w.replace(/[,.;:!?]+$/, "");
   if (!WORD_KEY_RE.test(w)) return null;
   return w;
-}
-
-/** positional diff (same semantics as the session hook's WordDiff): imperfect = any wrong/missing/extra char */
-function diffImperfect(target: string, typed: string): boolean {
-  if (target === typed) return false;
-  const minLen = Math.min(target.length, typed.length);
-  for (let i = 0; i < minLen; i++) {
-    if (target[i] !== typed[i]) return true;
-  }
-  return target.length !== typed.length;
 }
 
 /**
@@ -150,7 +141,7 @@ export function ingestWordOutcomes(learning: LearningData, outcomes: WordOutcome
     if (o.partial) continue;
     const key = normalizeWordKey(o.target);
     if (!key) continue;
-    const perfect = !diffImperfect(o.target, o.typed);
+    const perfect = !isWordImperfect(o.target, o.typed);
     const ms =
       o.ms !== null && Number.isFinite(o.ms) && o.ms >= MIN_WORD_MS && o.ms <= MAX_WORD_MS ? o.ms : null;
 

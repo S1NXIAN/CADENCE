@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import type { Settings } from "@/lib/typing/types";
 import { ACCENT_COLORS } from "@/lib/typing/types";
 import {
@@ -20,7 +21,8 @@ interface SettingsModalProps {
   update: (patch: Partial<Settings>) => void;
 }
 
-export function SettingsModal({ open, onOpenChange, settings, update }: SettingsModalProps) {
+/** memoized — while closed it skips rendering entirely on every parent render */
+export const SettingsModal = memo(function SettingsModal({ open, onOpenChange, settings, update }: SettingsModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-surface slim-scroll max-h-[85vh] max-w-lg overflow-y-auto font-mono" style={{ borderColor: "var(--border)" }}>
@@ -137,7 +139,7 @@ export function SettingsModal({ open, onOpenChange, settings, update }: Settings
       </DialogContent>
     </Dialog>
   );
-}
+});
 
 function ToggleRow({
   label,

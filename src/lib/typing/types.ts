@@ -1,5 +1,7 @@
 export type TestMode = "adaptive" | "time" | "words" | "quote";
 
+export type CaretStyle = "line" | "block" | "underline";
+
 export interface Settings {
   mode: TestMode;
   timeDuration: number; // seconds
@@ -10,7 +12,7 @@ export interface Settings {
   strictMode: boolean; // no backspace — forces accuracy
   liveWpm: boolean;
   sound: boolean;
-  caretStyle: "line" | "block" | "underline";
+  caretStyle: CaretStyle;
   accent: "lime" | "amber" | "cyan" | "rose";
   showCoach: boolean;
   onlinePacks: boolean; // when online: fetch + cache extra word/quote packs (full-potential layer)

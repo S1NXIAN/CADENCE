@@ -6,6 +6,7 @@ import type {
   TestResult,
 } from "./types";
 import { personalMedianLatency } from "./profiles";
+import { diffWord } from "./diff";
 
 /**
  * Test audit — the structured forensic layer behind the results screen.
@@ -296,19 +297,6 @@ const median = (xs: number[]): number => {
   const s = [...xs].sort((a, b) => a - b);
   return s[Math.floor(s.length / 2)];
 };
-
-function diffWord(target: string, typed: string): { incorrect: number; extra: number; missed: number } {
-  let incorrect = 0;
-  const minLen = Math.min(target.length, typed.length);
-  for (let i = 0; i < minLen; i++) {
-    if (target[i] !== typed[i]) incorrect++;
-  }
-  return {
-    incorrect,
-    extra: Math.max(0, typed.length - target.length),
-    missed: Math.max(0, target.length - typed.length),
-  };
-}
 
 /**
  * Build the full structured audit for a finished test.

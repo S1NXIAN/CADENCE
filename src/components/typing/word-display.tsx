@@ -1,18 +1,17 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, useEffect } from "react";
-import type { Settings } from "@/lib/typing/types";
+import { memo, useLayoutEffect, useRef, useState, useEffect } from "react";
+import type { CaretStyle } from "@/lib/typing/types";
 
 interface WordDisplayProps {
   words: string[];
-  typedFor: (i: number) => string;
-  wordIndex: number;
+  /** final committed attempt per finished word, index-aligned with `words` */
+  typedWords: string[];
+  /** in-progress attempt for the word at `wordIndex` */
   input: string;
+  wordIndex: number;
   status: "idle" | "running" | "done";
-  settings: Settings;
-  timeLeft: number | null;
-  liveWpm: number;
-  liveAcc: number;
+  caretStyle: CaretStyle;
   focusSignal: number;
   onKeyDown: (e: React.KeyboardEvent) => void;
 }
@@ -24,16 +23,71 @@ interface CaretPos {
   width: number;
 }
 
-export function WordDisplay({
+interface StreamWordProps {
+  word: string;
+  typed: string;
+  isCurrent: boolean;
+  /** the cursor has moved past this word (submitted or skipped) */
+  isPast: boolean;
+}
+
+const StreamWord = memo(function StreamWord({
+  word,
+  typed,
+  isCurrent,
+  isPast,
+}: StreamWordProps) {
+  const chars: React.ReactNode[] = [];
+  const maxLen = Math.max(word.length, typed.length);
+  for (let ci = 0; ci < maxLen; ci++) {
+    const targetChar = ci < word.length ? word[ci] : null;
+    const typedChar = ci < typed.length ? typed[ci] : null;
+    let cls = "text-dim";
+    if (typedChar !== null) {
+      if (targetChar === null) cls = "text-err/60";
+      else if (typedChar === targetChar) cls = "text-foreground";
+      else cls = "text-err";
+    } else if (targetChar !== null && isPast) {
+      // skipped char (word submitted early) — muted, reads as blurred past
+      // rather than lighting up like a wrong key
+      cls = "text-missed";
+    }
+    chars.push(
+      <span key={ci} data-ci={ci} className={cls}>
+        {targetChar ?? typedChar}
+      </span>
+    );
+  }
+  return (
+    <span
+      data-wi
+      className={`mr-[0.6ch] inline-block leading-[1.1] border-b-2 pb-[2px] ${
+        isCurrent ? "border-hue/50" : "border-transparent"
+      }`}
+    >
+      {chars}
+    </span>
+  );
+});
+
+/** count of words sharing the first visual line, via one top read per word */
+function measureFirstLineCount(stream: NodeListOf<HTMLElement>): number {
+  const top0 = stream[0]?.getBoundingClientRect().top ?? 0;
+  let count = 0;
+  for (const w of stream) {
+    if (w.getBoundingClientRect().top - top0 < 10) count++;
+    else break;
+  }
+  return count;
+}
+
+export const WordDisplay = memo(function WordDisplay({
   words,
-  typedFor,
-  wordIndex,
+  typedWords,
   input,
+  wordIndex,
   status,
-  settings,
-  timeLeft,
-  liveWpm,
-  liveAcc,
+  caretStyle,
   focusSignal,
   onKeyDown,
 }: WordDisplayProps) {
@@ -42,7 +96,7 @@ export function WordDisplay({
   const inputRef = useRef<HTMLInputElement>(null);
   const [caret, setCaret] = useState<CaretPos>({ left: 0, top: 0, height: 30, width: 3 });
   const [lineH, setLineH] = useState(57.6);
-  const [focused, setFocused] = useState(true);
+  const [isFocused, setIsFocused] = useState(true);
   // first rendered word. Only ever advances by WHOLE LINES (see measure
   // effect) — advancing word-by-word re-wraps the entire stream every
   // keystroke, which makes the top line visibly reshuffle mid-test.
@@ -54,6 +108,9 @@ export function WordDisplay({
   // stream reflows immediately while the transform/caret glide behind, and
   // the whole visible block jumps a full line for ~150ms.
   const [snapUi, setSnapUi] = useState(false);
+  // guard: the retire walk reads every rendered word's rect — run it at most
+  // once per (word list, line) the caret enters, not on every keystroke
+  const retireWalkRef = useRef<{ words: string[]; line: number }>({ words, line: -1 });
 
   // adjust-during-render (react.dev "storing information from previous
   // renders"): a fresh word list (new test / restart) rewinds the window.
@@ -84,7 +141,7 @@ export function WordDisplay({
     const inner = innerRef.current;
     if (!inner) return;
 
-    const target = inner.querySelector<HTMLElement>(`[data-wi="${wordIndex}"]`);
+    const target = inner.querySelectorAll<HTMLElement>("[data-wi]")[Math.max(0, wordIndex - from)];
     if (!target) return;
     const chars = target.querySelectorAll<HTMLElement>("[data-ci]");
     const el = chars[Math.min(input.length, Math.max(chars.length - 1, 0))];
@@ -114,18 +171,15 @@ export function WordDisplay({
     // and pixels identical across the swap — the retire is invisible.
     // (Requires lineH to be measured, which always happens on line 0.)
     const measuredLine = lineH > 0 ? Math.round(top / lineH) : 0;
-    if (measuredLine >= 3) {
-      const streamWords = inner.querySelectorAll<HTMLElement>("[data-wi]");
-      const top0 = streamWords[0]?.getBoundingClientRect().top ?? 0;
-      let firstLineCount = 0;
-      for (const w of streamWords) {
-        if (w.getBoundingClientRect().top - top0 < 10) firstLineCount++;
-        else break;
-      }
+    const walkedThisLine =
+      retireWalkRef.current.words === words && retireWalkRef.current.line === measuredLine;
+    if (measuredLine >= 3 && !walkedThisLine) {
+      retireWalkRef.current = { words, line: measuredLine };
+      const firstLineCount = measureFirstLineCount(
+        inner.querySelectorAll<HTMLElement>("[data-wi]")
+      );
       if (firstLineCount > 0 && from + firstLineCount <= wordIndex) {
-        setWinStart((prev) =>
-          Math.max(prev, from + firstLineCount)
-        );
+        setWinStart((prev) => Math.max(prev, from + firstLineCount));
         setCaret({
           left,
           top: top - lineH,
@@ -157,7 +211,7 @@ export function WordDisplay({
         }
       }
     }
-  }, [wordIndex, input, words, status]);
+  }, [wordIndex, input, words, status, from]);
 
   // active line → vertical scroll of the word stream
   const activeLine = Math.round(caret.top / lineH);
@@ -189,10 +243,10 @@ export function WordDisplay({
     };
   }, [snapUi]);
 
-  const caretStyle =
-    settings.caretStyle === "block"
+  const caretStyleProps =
+    caretStyle === "block"
       ? { width: caret.width, height: caret.height, top: caret.top }
-      : settings.caretStyle === "underline"
+      : caretStyle === "underline"
         ? { width: caret.width, height: 3, top: caret.top + caret.height - 3 }
         : { width: 2.5, height: caret.height, top: caret.top };
 
@@ -217,43 +271,15 @@ export function WordDisplay({
         className="absolute left-0 top-0 h-1 w-1 opacity-0"
         style={{ caretColor: "transparent" }}
         onKeyDown={onKeyDown}
-        onBlur={() => setFocused(false)}
-        onFocus={() => setFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        onFocus={() => setIsFocused(true)}
       />
-
-      {/* live metrics row */}
-      <div className="mb-4 flex h-8 items-end justify-between px-1 font-mono xl:mb-5 xl:h-10">
-        <div className="flex items-baseline gap-7 xl:gap-9">
-          {timeLeft !== null ? (
-            <div className="text-hue text-3xl font-semibold tabular-nums xl:text-4xl" aria-label="seconds left">
-              {timeLeft}
-            </div>
-          ) : (
-            <div className="text-dim tabular-nums text-sm xl:text-base">
-              {Math.min(wordIndex + 1, words.length)} / {words.length} words
-            </div>
-          )}
-          {settings.liveWpm && status === "running" && (
-            <>
-              <div className="text-sub tabular-nums text-lg xl:text-2xl" aria-live="off">
-                {liveWpm} <span className="text-dim text-xs xl:text-sm">wpm</span>
-              </div>
-              <div className="text-sub tabular-nums text-lg xl:text-2xl" aria-live="off">
-                {liveAcc}% <span className="text-dim text-xs xl:text-sm">acc</span>
-              </div>
-            </>
-          )}
-        </div>
-        <div className="text-dim pb-1 text-xs tracking-wide uppercase xl:text-sm">
-          {settings.mode === "adaptive" ? "adaptive" : settings.mode}
-        </div>
-      </div>
 
       {/* word stream */}
       <div
         ref={outerRef}
         className={`word-line relative overflow-hidden transition-opacity duration-200 ${
-          focused ? "opacity-100" : "opacity-35"
+          isFocused ? "opacity-100" : "opacity-35"
         }`}
         style={{ height: "calc(var(--word-line-h) * var(--word-lines, 3))" }}
         aria-label="typing test words"
@@ -272,67 +298,43 @@ export function WordDisplay({
           }}
         >
           {/* caret */}
-          {status !== "done" && focused && (
+          {status !== "done" && isFocused && (
             <div
               className={`bg-hue pointer-events-none absolute z-10 ${
                 status === "idle" ? "caret-blink" : ""
               }`}
               style={{
                 left: `${caret.left}px`,
-                top: `${caretStyle.top}px`,
-                width: `${caretStyle.width}px`,
-                height: `${caretStyle.height}px`,
+                top: `${caretStyleProps.top}px`,
+                width: `${caretStyleProps.width}px`,
+                height: `${caretStyleProps.height}px`,
                 transition: snapUi ? "none" : "left 90ms linear, top 120ms ease-out",
-                borderRadius: settings.caretStyle === "block" ? 2 : 1,
+                borderRadius: caretStyle === "block" ? 2 : 1,
               }}
             />
           )}
           {visible.map((word, vi) => {
             const wi = from + vi;
-            const typed = typedFor(wi);
-            const isCurrent = wi === wordIndex;
-            const chars: React.ReactNode[] = [];
-            const maxLen = Math.max(word.length, typed.length);
-            for (let ci = 0; ci < maxLen; ci++) {
-              const targetChar = ci < word.length ? word[ci] : null;
-              const typedChar = ci < typed.length ? typed[ci] : null;
-              let cls = "text-dim";
-              if (typedChar !== null) {
-                if (targetChar === null) cls = "text-err/60";
-                else if (typedChar === targetChar) cls = "text-foreground";
-                else cls = "text-err";
-              } else if (targetChar !== null && wi < wordIndex) {
-                // skipped char (word submitted early) — muted, reads as
-                // blurred past rather than lighting up like a wrong key
-                cls = "text-missed";
-              }
-              chars.push(
-                <span key={ci} data-ci={ci} className={cls}>
-                  {targetChar ?? typedChar}
-                </span>
-              );
-            }
+            const typed = wi < typedWords.length ? typedWords[wi] ?? "" : wi === wordIndex ? input : "";
             return (
-              <span
+              <StreamWord
                 key={wi}
-                data-wi={wi}
-                className={`mr-[0.6ch] inline-block leading-[1.1] border-b-2 pb-[2px] ${
-                  isCurrent ? "border-hue/50" : "border-transparent"
-                }`}
-              >
-                {chars}
-              </span>
+                word={word}
+                typed={typed}
+                isCurrent={wi === wordIndex}
+                isPast={wi < wordIndex}
+              />
             );
           })}
         </div>
       </div>
 
       {/* focus hint */}
-      {!focused && (
+      {!isFocused && (
         <div className="text-dim absolute inset-x-0 top-1/2 text-center font-mono text-sm">
           click anywhere or press any key to continue
         </div>
       )}
     </div>
   );
-}
+});
